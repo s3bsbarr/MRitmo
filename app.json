@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Ritmo",
+    "slug": "ritmo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#FFFFFF",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.sebas.ritmo",
+      "infoPlist": { "CADisableMinimumFrameDurationOnPhone": true }
+    },
+    "android": {
+      "package": "com.sebas.ritmo",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "backgroundColor": "#FFFFFF",
+          "dark": { "image": "./assets/splash-icon-dark.png", "backgroundColor": "#000000" }
+        }
+      ]
+    ]
+  }
+}
