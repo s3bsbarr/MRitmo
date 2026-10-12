@@ -1,2 +1,2 @@
-# MTime
-More Time productivity app
+# MRitmo
+My Ritmo productivity and habit tracker app
