@@ -18,7 +18,7 @@ const STAGES: { mood: Mood; pct: string; text: string }[] = [
 ];
 
 /** First launch: how Ritmo measures a day, your name, your character. */
-export function Welcome({ initial, onDone }: { initial: Settings; onDone: (patch: Partial<Settings>) => void }) {
+export function Welcome({ initial, onDone, onSignIn }: { initial: Settings; onDone: (patch: Partial<Settings>) => void; onSignIn: () => void }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
@@ -142,10 +142,17 @@ export function Welcome({ initial, onDone }: { initial: Settings; onDone: (patch
         <Press
           onPress={next}
           accessibilityRole="button"
-          style={{ height: 56, borderRadius: radius.pill, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center', marginBottom: insets.bottom }}
+          style={{ height: 56, borderRadius: radius.pill, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center', marginBottom: step === 0 ? 0 : insets.bottom }}
         >
           <Text style={[type.headline, { color: c.inkOnInk }]}>{step < 2 ? 'Siguiente' : 'Empezar'}</Text>
         </Press>
+        {step === 0 && (
+          <Press onPress={onSignIn} accessibilityRole="button" style={{ alignSelf: 'center', padding: space.md, marginTop: space.xs, marginBottom: insets.bottom }}>
+            <Text style={[type.callout, { color: c.textSecondary }]}>
+              ¿Ya tienes cuenta? <Text style={{ color: c.text, fontFamily: 'Inter_600SemiBold' }}>Inicia sesión</Text>
+            </Text>
+          </Press>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -67,7 +67,7 @@ export const font = {
  */
 export const type = {
   display: { fontFamily: font.semibold, fontSize: 64, lineHeight: 68, letterSpacing: -2.6 },
-  largeTitle: { fontFamily: font.bold, fontSize: 34, lineHeight: 40, letterSpacing: -1.1 },
+  largeTitle: { fontFamily: font.bold, fontSize: 39, lineHeight: 46, letterSpacing: -1.4 },
   title: { fontFamily: font.semibold, fontSize: 22, lineHeight: 28, letterSpacing: -0.5 },
   headline: { fontFamily: font.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.25 },
   body: { fontFamily: font.regular, fontSize: 17, lineHeight: 24, letterSpacing: -0.2 },

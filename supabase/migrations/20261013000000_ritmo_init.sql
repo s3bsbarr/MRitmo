@@ -1,12 +1,32 @@
--- Ritmo: cuentas, amigos y avance compartido.
--- Pegar completo en Supabase → SQL Editor → Run. Se puede correr más de una vez.
---
--- Principios:
---   * Las tareas siguen siendo privadas: a la nube solo sube el avance del día
---     (minutos cumplidos / planeados), no los títulos.
---   * Row Level Security activo en todas las tablas desde el primer día.
---   * Un amigo solo ve tu avance si la amistad fue aceptada por ambos.
+-- Ritmo · respaldo de la cuenta.
+-- Una fila por usuario con todo su estado (tareas, hábitos y ajustes).
+-- Solo el dueño puede leerla o escribirla (Row Level Security).
 
+create table if not exists public.user_state (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  data       jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_state enable row level security;
+
+drop policy if exists "own state select" on public.user_state;
+create policy "own state select" on public.user_state
+  for select to authenticated using (user_id = auth.uid());
+
+drop policy if exists "own state insert" on public.user_state;
+create policy "own state insert" on public.user_state
+  for insert to authenticated with check (user_id = auth.uid());
+
+drop policy if exists "own state update" on public.user_state;
+create policy "own state update" on public.user_state
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "own state delete" on public.user_state;
+create policy "own state delete" on public.user_state
+  for delete to authenticated using (user_id = auth.uid());
+
+-- ─── Amigos (preparado para la siguiente fase) ──────────────────────────────
 -- ─── Perfiles ──────────────────────────────────────────────────────────────
 create table if not exists public.profiles (
   id          uuid primary key references auth.users (id) on delete cascade,

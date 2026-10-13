@@ -140,7 +140,8 @@ function contentOf(state: TimerState): { label: string; title: string; detail: s
  * a running block shows the time it ends at; the live notification has seconds.
  */
 export function TimerWidget({ c, state, width, height }: { c: WC; state: TimerState; width: number; height: number }) {
-  const tall = height >= 100;
+  // Portrait reports the landscape height, so a 4×1 can claim ~110 dp; only real 2-row widgets pass this.
+  const tall = height >= 160;
   const { label, title, detail, buttons } = contentOf(state);
   const padH = 16;
   const inner = Math.max(120, width - padH * 2);
@@ -154,7 +155,7 @@ export function TimerWidget({ c, state, width, height }: { c: WC; state: TimerSt
   };
 
   if (!tall) {
-    const size = Math.min(44, Math.max(34, height - 16));
+    const size = 40;
     const buttonsW = buttons.length * (size + 8);
     const textW = Math.max(60, inner - buttonsW - 4);
     return (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { dayKey, Habit, loadHabits, loadTasks, progressOf, saveHabits, saveTasks, shiftDay, Task, tasksForDay, uid, upcomingTasks } from './data';
+import { dayKey, Habit, loadHabits, loadTasks, progressOf, rememberDeleted, saveHabits, saveTasks, shiftDay, Task, tasksForDay, uid, upcomingTasks } from './data';
 
 export { dayKey, progressOf, shiftDay };
 export type { Habit, Task };
@@ -56,7 +56,13 @@ export function useTasks() {
     [commit],
   );
 
-  const remove = useCallback((id: string) => commit((prev) => prev.filter((t) => t.id !== id)), [commit]);
+  const remove = useCallback(
+    (id: string) => {
+      rememberDeleted(id);
+      commit((prev) => prev.filter((t) => t.id !== id));
+    },
+    [commit],
+  );
 
   const todayTasks = useMemo(() => tasksForDay(tasks, today), [tasks, today]);
 
@@ -124,7 +130,13 @@ export function useHabits() {
     [commit],
   );
 
-  const remove = useCallback((id: string) => commit((prev) => prev.filter((h) => h.id !== id)), [commit]);
+  const remove = useCallback(
+    (id: string) => {
+      rememberDeleted(id);
+      commit((prev) => prev.filter((h) => h.id !== id));
+    },
+    [commit],
+  );
 
   return { ready, habits, add, toggleToday, remove, reload };
 }

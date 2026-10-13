@@ -9,17 +9,19 @@ import { AppState, Linking, Platform, useColorScheme, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { applyAction, resyncAll } from './src/actions';
 import { AddSheet, NewItem } from './src/components/AddSheet';
+import { AuthSheet } from './src/components/AuthSheet';
 import { ConfirmRequest, ConfirmSheet } from './src/components/ConfirmSheet';
 import { BlurTargetContext } from './src/components/Glass';
 import { NavBar, Tab } from './src/components/NavBar';
-import { defaultSettings, emptyFocus, FocusState, loadFocus, loadSettings, saveFocus, saveSettings, Settings, ThemePref } from './src/data';
-import { configureNotifications, onAppBackground, onAppForeground } from './src/effects';
+import { defaultSettings, emptyFocus, FocusState, loadFocus, loadMeta, loadSettings, saveFocus, saveSettings, Settings, ThemePref } from './src/data';
+import { configureNotifications, onAppBackground, onAppForeground, requestNotificationPermission } from './src/effects';
 import { Focus } from './src/screens/Focus';
-import { SettingsScreen } from './src/screens/Settings';
+import { AccountInfo, SettingsScreen } from './src/screens/Settings';
 import { Summary } from './src/screens/Summary';
 import { Today } from './src/screens/Today';
 import { Welcome } from './src/screens/Welcome';
 import { useHabits, useTasks } from './src/store';
+import { getSession, handleAuthUrl, scheduleSync, signOut, supabase, syncNow } from './src/sync';
 import { palettes, ThemeContext } from './src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -38,6 +40,8 @@ export default function App() {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [focus, setFocusState] = useState<FocusState>(emptyFocus);
   const target = useRef<View>(null);
+  const [account, setAccount] = useState<AccountInfo>({ email: null, syncing: false });
+  const [authMode, setAuthMode] = useState<'signup' | 'signin' | null>(null);
 
   const snapRef = useRef({ tasks: api.tasks, habits: habitsApi.habits, focus, settings });
   snapRef.current = { tasks: api.tasks, habits: habitsApi.habits, focus, settings };
@@ -78,27 +82,70 @@ export default function App() {
   const reloaders = useRef({ tasks: api.reload, habits: habitsApi.reload });
   reloaders.current = { tasks: api.reload, habits: habitsApi.reload };
 
-  /** Re-read everything a widget or a notification button may have changed. */
+  /** Re-read everything a widget, a notification button or a restore may have changed. */
   const reloadAll = useCallback(async () => {
-    const [, , f] = await Promise.all([reloaders.current.tasks(), reloaders.current.habits(), loadFocus()]);
+    const [, , f, st] = await Promise.all([reloaders.current.tasks(), reloaders.current.habits(), loadFocus(), loadSettings()]);
     setFocusState(f);
+    setSettings(st);
   }, []);
+
+  /** Pull the backup, merge, push. Reloads the screen if the backup brought anything new. */
+  const runSync = useCallback(async () => {
+    setAccount((a) => ({ ...a, syncing: true }));
+    const r = await syncNow();
+    if (r.ok && r.changedLocal) await reloadAll();
+    const meta = await loadMeta();
+    setAccount((a) => ({
+      ...a,
+      syncing: false,
+      lastSync: meta.lastSync,
+      error: r.ok || r.reason === 'signed-out' ? null : `No se pudo respaldar: ${r.message}`,
+    }));
+  }, [reloadAll]);
+
+  // Session: restore it on launch and follow sign-in / sign-out.
+  useEffect(() => {
+    getSession().then((sess) => {
+      setAccount((a) => ({ ...a, email: sess?.user.email ?? null }));
+      if (sess) runSync();
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setAccount((a) => ({ ...a, email: sess?.user.email ?? null }));
+    });
+    return () => data.subscription.unsubscribe();
+  }, [runSync]);
+
+  // Back up a few seconds after any change, when signed in.
+  useEffect(() => {
+    if (!ready || !account.email) return;
+    scheduleSync((r) => {
+      loadMeta().then((m) => setAccount((a) => ({ ...a, lastSync: m.lastSync, error: r.ok ? null : a.error })));
+    });
+  }, [ready, account.email, api.tasks, habitsApi.habits, settings]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (state) => {
       if (state === 'active') {
         await onAppForeground();
         await reloadAll();
+        if (await getSession()) runSync();
       } else if (state === 'background') {
         onAppBackground(snapRef.current);
       }
     });
     return () => sub.remove();
-  }, [reloadAll]);
+  }, [reloadAll, runSync]);
 
   // ritmo://hoy, ritmo://foco, ritmo://resumen and ritmo://nueva come from widgets and notifications.
   const route = useCallback((url: string | null | undefined) => {
     if (!url || !url.startsWith('ritmo://')) return;
+    if (url.startsWith('ritmo://auth')) {
+      // Email confirmation or password reset link opened the app.
+      handleAuthUrl(url).then((ok) => {
+        if (ok) runSync();
+      });
+      return;
+    }
     const path = url.replace(/^ritmo:\/\//, '').split(/[?#/]/)[0];
     setShowSettings(false);
     if (path === 'foco') setTab('foco');
@@ -107,7 +154,7 @@ export default function App() {
       setTab('hoy');
       setAdding(true);
     } else if (path === 'hoy') setTab('hoy');
-  }, []);
+  }, [runSync]);
 
   useEffect(() => {
     Linking.getInitialURL().then(route).catch(() => {});
@@ -170,7 +217,16 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <ThemeContext.Provider value={theme}>
-          <Welcome initial={settings} onDone={update} />
+          <Welcome initial={settings} onDone={update} onSignIn={() => setAuthMode('signin')} />
+          <AuthSheet
+            visible={authMode !== null}
+            initialMode={authMode ?? 'signin'}
+            onClose={() => setAuthMode(null)}
+            onSignedIn={async () => {
+              await runSync();
+              requestNotificationPermission();
+            }}
+          />
           <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         </ThemeContext.Provider>
       </SafeAreaProvider>
@@ -200,11 +256,32 @@ export default function App() {
             {!showSettings && <NavBar tab={tab} onTab={setTab} onAdd={() => setAdding(true)} />}
             {showSettings && (
               <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-                <SettingsScreen settings={settings} update={update} onClose={() => setShowSettings(false)} />
+                <SettingsScreen
+                  settings={settings}
+                  update={update}
+                  onClose={() => setShowSettings(false)}
+                  account={account}
+                  onAuth={(m) => setAuthMode(m)}
+                  onSignOut={() =>
+                    setConfirm({
+                      title: '¿Cerrar sesión?',
+                      subject: account.email ?? '',
+                      detail: 'Tus datos se quedan en este teléfono y en tu respaldo.',
+                      confirmLabel: 'Cerrar sesión',
+                      destructive: true,
+                      onConfirm: () => {
+                        signOut();
+                        setAccount({ email: null, syncing: false });
+                      },
+                    })
+                  }
+                  onSyncNow={runSync}
+                />
               </View>
             )}
             <AddSheet visible={adding} onClose={() => setAdding(false)} onAdd={onAdd} />
             <ConfirmSheet request={confirm} onClose={() => setConfirm(null)} />
+            <AuthSheet visible={authMode !== null} initialMode={authMode ?? 'signup'} onClose={() => setAuthMode(null)} onSignedIn={runSync} />
             <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           </View>
         </BlurTargetContext.Provider>

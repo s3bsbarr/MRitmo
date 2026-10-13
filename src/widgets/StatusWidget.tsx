@@ -1,7 +1,7 @@
 import { FlexWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
 import { moodFor } from '../avatar/mood';
 import type { Gender } from '../data';
-import { formatMinutes } from '../format';
+import { formatShort } from '../format';
 import { F, WC } from './colors';
 import { spriteSvg } from './sprite';
 
@@ -17,54 +17,89 @@ export type StatusProps = {
 };
 
 /**
- * Status widget. Small sizes show only the character; from about 3 cells wide
- * it adds the day's percentage and a progress bar next to it.
+ * Status widget in three shapes by real width:
+ *  - narrow (1×1): the character alone
+ *  - square (2×2): character on top, percentage and bar underneath
+ *  - wide (3+ cells): character beside the percentage, bar and minutes
+ * Android reports the landscape (larger) height in portrait, so layouts are
+ * chosen by width and sized conservatively in height.
  */
 export function StatusWidget({ c, gender, done, total, ratio, hasTasks, width, height }: StatusProps) {
   const mood = moodFor(ratio, hasTasks);
-  const wide = width >= 180;
   const pct = Math.round(ratio * 100);
-  const spriteH = Math.max(48, Math.min(height - 24, wide ? 120 : 140));
-  const spriteW = Math.round((spriteH * 24) / 26);
-  const barW = Math.max(60, width - spriteW - 64);
+  const sprite = spriteSvg(gender, mood, c.scheme);
+  const label = hasTasks ? `Ritmo, ${pct} por ciento del día` : 'Ritmo, sin tareas hoy';
+  const base = {
+    height: 'match_parent' as const,
+    width: 'match_parent' as const,
+    backgroundColor: c.bg,
+    borderRadius: 24,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  };
 
-  return (
-    <FlexWidget
-      clickAction="OPEN_URI"
-      clickActionData={{ uri: 'ritmo://hoy' }}
-      accessibilityLabel={hasTasks ? `Ritmo, ${pct} por ciento del día` : 'Ritmo, sin tareas hoy'}
-      style={{
-        height: 'match_parent',
-        width: 'match_parent',
-        backgroundColor: c.bg,
-        borderRadius: 24,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: wide ? 'flex-start' : 'center',
-        paddingHorizontal: wide ? 16 : 8,
-      }}
-    >
-      <SvgWidget svg={spriteSvg(gender, mood, c.scheme)} style={{ height: spriteH, width: spriteW }} />
-      {wide && (
-        <FlexWidget style={{ marginLeft: 16, flexDirection: 'column', justifyContent: 'center' }}>
-          <FlexWidget style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-            <TextWidget
-              text={hasTasks ? String(pct) : '—'}
-              style={{ fontSize: height >= 140 ? 44 : 34, fontFamily: F.semibold, color: c.text, letterSpacing: -0.04 }}
-            />
-            <TextWidget text={hasTasks ? ' %' : ''} style={{ fontSize: 16, fontFamily: F.medium, color: c.secondary, marginBottom: 6 }} />
-          </FlexWidget>
+  const Bar = ({ w }: { w: number }) => (
+    <FlexWidget style={{ width: w, height: 5, borderRadius: 3, backgroundColor: c.track, flexDirection: 'row' }}>
+      {ratio > 0 ? <FlexWidget style={{ width: Math.max(5, Math.round(w * Math.min(1, ratio))), height: 5, borderRadius: 3, backgroundColor: c.ink }} /> : null}
+    </FlexWidget>
+  );
+
+  const Pct = ({ size }: { size: number }) => (
+    <FlexWidget style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+      <TextWidget text={hasTasks ? String(pct) : '—'} style={{ fontSize: size, fontFamily: F.semibold, color: c.text }} />
+      {hasTasks ? <TextWidget text=" %" style={{ fontSize: Math.round(size * 0.42), fontFamily: F.medium, color: c.secondary, marginBottom: Math.round(size * 0.12) }} /> : null}
+    </FlexWidget>
+  );
+
+  // Wide: three or more cells across.
+  if (width >= 250) {
+    // One row reports ~110 dp in portrait but is ~80 dp on screen.
+    const oneRow = height < 160;
+    const spriteH = oneRow ? 64 : 96;
+    const spriteW = Math.round((spriteH * 24) / 26);
+    const infoW = width - spriteW - 16 * 2 - 16;
+    return (
+      <FlexWidget clickAction="OPEN_URI" clickActionData={{ uri: 'ritmo://hoy' }} accessibilityLabel={label} style={{ ...base, flexDirection: 'row', paddingHorizontal: 16 }}>
+        <SvgWidget svg={sprite} style={{ height: spriteH, width: spriteW }} />
+        <FlexWidget style={{ width: infoW, marginLeft: 16, flexDirection: 'column', justifyContent: 'center' }}>
+          <Pct size={oneRow ? 30 : 40} />
           <TextWidget
-            text={hasTasks ? `${formatMinutes(done)} de ${formatMinutes(total)}` : 'Toca para planear tu día'}
+            text={hasTasks ? `${formatShort(done)} de ${formatShort(total)}` : 'Toca para planear tu día'}
+            maxLines={1}
+            truncate="END"
             style={{ fontSize: 13, fontFamily: F.regular, color: c.secondary }}
           />
-          <FlexWidget style={{ width: barW, height: 5, borderRadius: 3, backgroundColor: c.track, marginTop: 10, flexDirection: 'row' }}>
-            {ratio > 0 && (
-              <FlexWidget style={{ width: Math.max(5, Math.round(barW * Math.min(1, ratio))), height: 5, borderRadius: 3, backgroundColor: c.ink }} />
-            )}
+          <FlexWidget style={{ marginTop: oneRow ? 6 : 10 }}>
+            <Bar w={infoW} />
           </FlexWidget>
         </FlexWidget>
-      )}
+      </FlexWidget>
+    );
+  }
+
+  // Square: two cells across and tall enough for a second row.
+  if (width >= 130 && height >= 130) {
+    const spriteH = 76;
+    const spriteW = Math.round((spriteH * 24) / 26);
+    const barW = Math.min(110, width - 40);
+    return (
+      <FlexWidget clickAction="OPEN_URI" clickActionData={{ uri: 'ritmo://hoy' }} accessibilityLabel={label} style={{ ...base, flexDirection: 'column' }}>
+        <SvgWidget svg={sprite} style={{ height: spriteH, width: spriteW }} />
+        <FlexWidget style={{ marginTop: 6 }}>
+          <Pct size={26} />
+        </FlexWidget>
+        <FlexWidget style={{ marginTop: 6 }}>
+          <Bar w={barW} />
+        </FlexWidget>
+      </FlexWidget>
+    );
+  }
+
+  // Narrow: the character alone.
+  const spriteH = Math.max(44, Math.min(height, width) - 16);
+  return (
+    <FlexWidget clickAction="OPEN_URI" clickActionData={{ uri: 'ritmo://hoy' }} accessibilityLabel={label} style={base}>
+      <SvgWidget svg={sprite} style={{ height: spriteH, width: Math.round((spriteH * 24) / 26) }} />
     </FlexWidget>
   );
 }

@@ -12,11 +12,33 @@ import { requestNotificationPermission } from '../effects';
 import { font, radius, space, type, useTheme } from '../theme';
 import * as Notifications from 'expo-notifications';
 
+export type AccountInfo = {
+  email: string | null;
+  lastSync?: number;
+  syncing: boolean;
+  error?: string | null;
+};
+
 type Props = {
   settings: SettingsT;
   update: (patch: Partial<SettingsT>) => void;
   onClose: () => void;
+  account: AccountInfo;
+  onAuth: (mode: 'signup' | 'signin') => void;
+  onSignOut: () => void;
+  onSyncNow: () => void;
 };
+
+function ago(ms?: number) {
+  if (!ms) return 'aún no';
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 60) return 'hace un momento';
+  const m = Math.round(s / 60);
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `hace ${h} h`;
+  return `hace ${Math.round(h / 24)} d`;
+}
 
 function Section({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) {
   const { c } = useTheme();
@@ -98,7 +120,7 @@ function ToggleRow({ label, detail, value, onChange, last }: { label: string; de
   );
 }
 
-export function SettingsScreen({ settings, update, onClose }: Props) {
+export function SettingsScreen({ settings, update, onClose, account, onAuth, onSignOut, onSyncNow }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(settings.name);
@@ -149,6 +171,44 @@ export function SettingsScreen({ settings, update, onClose }: Props) {
         <Text style={[type.largeTitle, { color: c.text, marginTop: space.sm }]} accessibilityRole="header">
           Configuración
         </Text>
+
+        <Section
+          title="Cuenta"
+          note={
+            account.email
+              ? account.error ?? `Respaldo ${account.syncing ? 'en curso…' : ago(account.lastSync)}. Se respalda solo después de cada cambio.`
+              : 'Sin cuenta, tus datos viven solo en este teléfono. Con cuenta, al reinstalar o cambiar de teléfono vuelve todo.'
+          }
+        >
+          {account.email ? (
+            <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 60, paddingHorizontal: space.lg, gap: space.md, borderBottomWidth: 1, borderBottomColor: c.separator }}>
+                <Ionicons name="person-circle-outline" size={26} color={c.text} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.body, { color: c.text }]} numberOfLines={1}>{account.email}</Text>
+                  <Text style={[type.footnote, { color: c.textSecondary }]}>Sesión iniciada</Text>
+                </View>
+              </View>
+              <Press onPress={onSyncNow} disabled={account.syncing} scaleTo={0.99} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md, borderBottomWidth: 1, borderBottomColor: c.separator }}>
+                <Ionicons name="cloud-upload-outline" size={20} color={c.text} />
+                <Text style={[type.body, { color: c.text, flex: 1 }]}>{account.syncing ? 'Respaldando…' : 'Respaldar ahora'}</Text>
+              </Press>
+              <Press onPress={onSignOut} scaleTo={0.99} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md }}>
+                <Ionicons name="log-out-outline" size={20} color={c.danger} />
+                <Text style={[type.body, { color: c.danger }]}>Cerrar sesión</Text>
+              </Press>
+            </View>
+          ) : (
+            <View style={{ gap: space.sm }}>
+              <Press onPress={() => onAuth('signup')} accessibilityRole="button" style={{ height: 52, borderRadius: radius.pill, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={[type.headline, { color: c.inkOnInk }]}>Crear cuenta</Text>
+              </Press>
+              <Press onPress={() => onAuth('signin')} accessibilityRole="button" style={{ height: 52, borderRadius: radius.pill, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={[type.headline, { color: c.text }]}>Ya tengo cuenta</Text>
+              </Press>
+            </View>
+          )}
+        </Section>
 
         <Section title="Tu nombre" note="Aparece en los recordatorios y cuando compartes tu día.">
           <TextInput
@@ -316,7 +376,7 @@ export function SettingsScreen({ settings, update, onClose }: Props) {
           </Section>
         )}
 
-        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.2</Text>
+        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.3</Text>
       </ScrollView>
     </View>
   );

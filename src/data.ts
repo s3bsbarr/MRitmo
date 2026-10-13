@@ -84,6 +84,8 @@ const TASKS_KEY = 'ritmo.tasks.v1';
 const FOCUS_KEY = 'ritmo.focus.v1';
 const SETTINGS_KEY = 'ritmo.settings.v1';
 const HABITS_KEY = 'ritmo.habits.v1';
+const META_KEY = 'ritmo.sync.v1';
+const DELETED_KEY = 'ritmo.deleted.v1';
 // Pre-settings keys from build 1–2, migrated on first read.
 const LEGACY_THEME_KEY = 'ritmo.theme.v1';
 const LEGACY_AVATAR_KEY = 'ritmo.avatar.v1';
@@ -187,7 +189,10 @@ export async function loadHabits(): Promise<Habit[]> {
   return Array.isArray(h) ? h : [];
 }
 
-export const saveHabits = (h: Habit[]) => writeJson(HABITS_KEY, h);
+export const saveHabits = async (h: Habit[]) => {
+  await writeJson(HABITS_KEY, h);
+  await touch();
+};
 
 export function nextPending(tasks: Task[], day = dayKey()) {
   return tasksForDay(tasks, day).find((t) => !t.done) ?? null;
@@ -213,7 +218,10 @@ export async function loadTasks(): Promise<Task[]> {
   return Array.isArray(t) ? t : [];
 }
 
-export const saveTasks = (tasks: Task[]) => writeJson(TASKS_KEY, tasks);
+export const saveTasks = async (tasks: Task[]) => {
+  await writeJson(TASKS_KEY, tasks);
+  await touch();
+};
 
 export async function loadFocus(): Promise<FocusState> {
   const f = await readJson<FocusState>(FOCUS_KEY, emptyFocus);
@@ -241,7 +249,10 @@ export async function loadSettings(): Promise<Settings> {
   return migrated;
 }
 
-export const saveSettings = (s: Settings) => writeJson(SETTINGS_KEY, s);
+export const saveSettings = async (s: Settings) => {
+  await writeJson(SETTINGS_KEY, s);
+  await touch();
+};
 
 /** Remaining ms of a focus block right now. */
 export function remainingOf(f: FocusState, now = Date.now()) {
@@ -280,4 +291,89 @@ export function pauseFocus(f: FocusState, now = Date.now()): FocusState {
 
 export function completeTask(tasks: Task[], id: string, now = Date.now()): Task[] {
   return tasks.map((t) => (t.id === id ? { ...t, done: true, doneAt: now } : t));
+}
+
+/* ─── Account sync ─────────────────────────────────────────────────────────
+ * The whole state travels as one document. Every local save stamps
+ * `updatedAt`; deletions are remembered so they never come back from the
+ * other side. */
+
+export type SyncMeta = { updatedAt: number; lastSync?: number };
+
+export type SyncState = {
+  tasks: Task[];
+  habits: Habit[];
+  settings: Settings;
+  deleted: string[];
+  updatedAt: number;
+};
+
+export async function loadMeta(): Promise<SyncMeta> {
+  return readJson<SyncMeta>(META_KEY, { updatedAt: 0 });
+}
+
+export async function saveMeta(m: SyncMeta) {
+  await writeJson(META_KEY, m);
+}
+
+/** Mark local data as changed now. */
+export async function touch(now = Date.now()) {
+  const m = await loadMeta();
+  await writeJson(META_KEY, { ...m, updatedAt: now });
+}
+
+export async function loadDeleted(): Promise<string[]> {
+  const d = await readJson<string[]>(DELETED_KEY, []);
+  return Array.isArray(d) ? d : [];
+}
+
+export async function rememberDeleted(id: string) {
+  const d = await loadDeleted();
+  if (!d.includes(id)) await writeJson(DELETED_KEY, [...d, id].slice(-3000));
+}
+
+export async function loadSyncState(): Promise<SyncState> {
+  const [tasks, habits, settings, deleted, meta] = await Promise.all([loadTasks(), loadHabits(), loadSettings(), loadDeleted(), loadMeta()]);
+  return { tasks, habits, settings, deleted, updatedAt: meta.updatedAt };
+}
+
+/** Write a merged state back without stamping it as a new local change. */
+export async function applySyncState(st: SyncState, lastSync = Date.now()) {
+  await Promise.all([
+    writeJson(TASKS_KEY, st.tasks),
+    writeJson(HABITS_KEY, st.habits),
+    writeJson(SETTINGS_KEY, st.settings),
+    writeJson(DELETED_KEY, st.deleted),
+  ]);
+  await saveMeta({ updatedAt: st.updatedAt, lastSync });
+}
+
+function unionById<T extends { id: string }>(newer: T[], older: T[], deleted: Set<string>) {
+  const seen = new Set(newer.map((x) => x.id));
+  return [...newer, ...older.filter((x) => !seen.has(x.id))].filter((x) => !deleted.has(x.id));
+}
+
+/**
+ * Pure merge. The side changed most recently wins any conflict; items that
+ * exist only on the other side are kept (created offline elsewhere); deleted
+ * ids stay deleted on both.
+ */
+export function mergeState(local: SyncState, remote: SyncState): SyncState {
+  const localNewer = local.updatedAt >= remote.updatedAt;
+  const newer = localNewer ? local : remote;
+  const older = localNewer ? remote : local;
+  const deletedList = [...new Set([...(local.deleted ?? []), ...(remote.deleted ?? [])])].slice(-3000);
+  const deleted = new Set(deletedList);
+  return {
+    tasks: unionById(newer.tasks ?? [], older.tasks ?? [], deleted),
+    habits: unionById(newer.habits ?? [], older.habits ?? [], deleted),
+    settings: {
+      ...defaultSettings,
+      ...older.settings,
+      ...newer.settings,
+      onboarded: Boolean(local.settings?.onboarded || remote.settings?.onboarded),
+    },
+    deleted: deletedList,
+    updatedAt: Math.max(local.updatedAt, remote.updatedAt),
+  };
 }
