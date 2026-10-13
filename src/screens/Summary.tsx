@@ -2,17 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ScrollView, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Gender } from '../avatar/Avatar';
 import { NAV_HEIGHT } from '../components/NavBar';
 import { Press } from '../components/Press';
 import { dayInitial, formatMinutes } from '../format';
 import { progressOf, TasksApi } from '../store';
-import { radius, space, ThemePref, type, useTheme } from '../theme';
+import { radius, space, type, useTheme } from '../theme';
 
 const CHART_H = 140;
 
-export function Summary({ api, gender, setGender }: { api: TasksApi; gender: Gender; setGender: (g: Gender) => void }) {
-  const { c, pref, setPref } = useTheme();
+export function Summary({ api, name, onOpenSettings }: { api: TasksApi; name: string; onOpenSettings: () => void }) {
+  const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { week, todayTasks } = api;
 
@@ -27,7 +26,7 @@ export function Summary({ api, gender, setGender }: { api: TasksApi; gender: Gen
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const pct = Math.round(today.ratio * 100);
     const lines = [
-      `Mi día en Ritmo: ${pct}% cumplido`,
+      name ? `${name} en Ritmo: ${pct}% del día cumplido` : `Mi día en Ritmo: ${pct}% cumplido`,
       `${formatMinutes(today.done)} de ${formatMinutes(today.total)} planeadas`,
       ...todayTasks.map((t) => `${t.done ? '✓' : '○'} ${t.title} · ${formatMinutes(t.minutes)}`),
     ];
@@ -44,12 +43,6 @@ export function Summary({ api, gender, setGender }: { api: TasksApi; gender: Gen
     ['Días con avance', `${activeDays} de 7`],
   ];
 
-  const themes: { key: ThemePref; label: string }[] = [
-    { key: 'system', label: 'Sistema' },
-    { key: 'light', label: 'Claro' },
-    { key: 'dark', label: 'Oscuro' },
-  ];
-
   return (
     <ScrollView
       contentContainerStyle={{
@@ -59,9 +52,20 @@ export function Summary({ api, gender, setGender }: { api: TasksApi; gender: Gen
       }}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">
-        Resumen
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">
+          Resumen
+        </Text>
+        <Press
+          onPress={onOpenSettings}
+          accessibilityRole="button"
+          accessibilityLabel="Configuración"
+          scaleTo={0.9}
+          style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface }}
+        >
+          <Ionicons name="settings-outline" size={21} color={c.text} />
+        </Press>
+      </View>
       <Text style={[type.callout, { color: c.textSecondary, marginTop: 2 }]}>Últimos siete días</Text>
 
       <View
@@ -135,79 +139,6 @@ export function Summary({ api, gender, setGender }: { api: TasksApi; gender: Gen
         Envía tu avance a un amigo para rendir cuentas.
       </Text>
 
-      <Text style={[type.headline, { color: c.text, marginTop: space.xxxl, marginBottom: space.md }]}>Personaje</Text>
-      <View style={{ flexDirection: 'row', gap: space.md }} accessibilityRole="radiogroup">
-        {([
-          ['m', 'Hombre'],
-          ['f', 'Mujer'],
-        ] as [Gender, string][]).map(([g, label]) => {
-          const active = gender === g;
-          return (
-            <Press
-              key={g}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setGender(g);
-              }}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={label}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                paddingTop: space.lg,
-                paddingBottom: space.md,
-                borderRadius: radius.lg,
-                backgroundColor: c.surface,
-                borderWidth: 1.5,
-                borderColor: active ? c.ink : 'transparent',
-              }}
-            >
-              <Avatar gender={g} mood="foco" px={3} />
-              <Text style={[type.callout, { color: active ? c.text : c.textSecondary, marginTop: space.sm }]}>{label}</Text>
-            </Press>
-          );
-        })}
-      </View>
-      <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.sm }]}>
-        Se sienta tranquilo al empezar, se pone de pie al pasar la mitad y celebra cuando completas el día.
-      </Text>
-
-      <Text style={[type.headline, { color: c.text, marginTop: space.xxl, marginBottom: space.md }]}>Apariencia</Text>
-      <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.md, padding: 4 }} accessibilityRole="radiogroup">
-        {themes.map((t) => {
-          const active = pref === t.key;
-          return (
-            <Press
-              key={t.key}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setPref(t.key);
-              }}
-              scaleTo={0.96}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
-              style={{
-                flex: 1,
-                height: 40,
-                borderRadius: radius.sm,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: active ? c.bg : 'transparent',
-                shadowColor: '#000',
-                shadowOpacity: active ? 0.08 : 0,
-                shadowRadius: 6,
-                shadowOffset: { width: 0, height: 2 },
-                elevation: active ? 2 : 0,
-              }}
-            >
-              <Text style={[type.callout, { color: active ? c.text : c.textSecondary }]}>{t.label}</Text>
-            </Press>
-          );
-        })}
-      </View>
-
-      <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.0</Text>
     </ScrollView>
   );
 }

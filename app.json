@@ -10,7 +10,9 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.sebas.ritmo",
-      "infoPlist": { "CADisableMinimumFrameDurationOnPhone": true }
+      "infoPlist": {
+        "CADisableMinimumFrameDurationOnPhone": true
+      }
     },
     "android": {
       "package": "com.sebas.ritmo",
@@ -22,7 +24,14 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_PHONE_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,9 +44,57 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 120,
           "backgroundColor": "#FFFFFF",
-          "dark": { "image": "./assets/splash-icon-dark.png", "backgroundColor": "#000000" }
+          "dark": {
+            "image": "./assets/splash-icon-dark.png",
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0A0A0B",
+          "defaultChannel": "ritmo_reminders"
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/inter/500Medium/Inter_500Medium.ttf",
+            "./node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/inter/700Bold/Inter_700Bold.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "RitmoEstado",
+              "label": "Ritmo · Estado",
+              "description": "Tu personaje y el avance del día",
+              "minWidth": "57dp",
+              "minHeight": "57dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "RitmoFoco",
+              "label": "Ritmo · Foco",
+              "description": "Inicia tu próxima tarea o controla el temporizador",
+              "minWidth": "250dp",
+              "minHeight": "57dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 1,
+              "resizeMode": "vertical",
+              "maxResizeHeight": "180dp",
+              "updatePeriodMillis": 1800000
+            }
+          ]
         }
       ]
-    ]
+    ],
+    "scheme": "ritmo"
   }
 }

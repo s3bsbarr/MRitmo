@@ -13,9 +13,9 @@ import { formatMinutes, longDate } from '../format';
 import { progressOf, TasksApi } from '../store';
 import { radius, space, type, useTheme } from '../theme';
 
-type Props = { api: TasksApi; gender: Gender; onAdd: () => void; onFocus: (id: string) => void };
+type Props = { api: TasksApi; gender: Gender; name: string; onAdd: () => void; onFocus: (id: string) => void };
 
-export function Today({ api, gender, onAdd, onFocus }: Props) {
+export function Today({ api, gender, name, onAdd, onFocus }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { todayTasks, carryover } = api;
@@ -104,7 +104,7 @@ export function Today({ api, gender, onAdd, onFocus }: Props) {
 
       {todayTasks.length === 0 ? (
         <View style={{ marginTop: space.xxxl + space.xl }}>
-          <Text style={[type.title, { color: c.text }]}>Planea tu día por tiempo.</Text>
+          <Text style={[type.title, { color: c.text }]}>{name ? `Planea tu día, ${name}.` : 'Planea tu día por tiempo.'}</Text>
           <Text style={[type.body, { color: c.textSecondary, marginTop: space.sm }]}>
             Agrega cada tarea con lo que te va a tomar. Tu avance se mide en horas cumplidas, así una tarea de dos horas pesa más que una de quince minutos.
           </Text>

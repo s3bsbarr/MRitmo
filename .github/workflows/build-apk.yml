@@ -50,6 +50,10 @@ jobs:
           sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a/' android/gradle.properties
           grep -q '^reactNativeArchitectures=' android/gradle.properties || echo 'reactNativeArchitectures=arm64-v8a' >> android/gradle.properties
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          # Every build gets a higher version so it installs over the previous one.
+          sed -i -E "s/versionCode [0-9]+/versionCode $((100 + ${{ github.run_number }}))/" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]+\"/versionName \"1.1.${{ github.run_number }}\"/" android/app/build.gradle
+          grep -E "versionCode|versionName" android/app/build.gradle
 
       - name: Build release APK
         working-directory: android
@@ -61,10 +65,26 @@ jobs:
           grep -nE "error|Error|FAILURE|What went wrong|Could not|Exception" build.log | tail -40 | while IFS= read -r line; do echo "::error::$line"; done
           tail -25 build.log | while IFS= read -r line; do echo "::error::$line"; done
 
-      - name: Name the APK
+      - name: Sign with Ritmo's own key (when the secrets are set)
+        env:
+          RITMO_KEYSTORE_B64: ${{ secrets.RITMO_KEYSTORE_B64 }}
+          RITMO_KEYSTORE_PASSWORD: ${{ secrets.RITMO_KEYSTORE_PASSWORD }}
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/release/app-release.apk "dist/Ritmo-${{ github.run_number }}.apk"
+          OUT="dist/Ritmo-${{ github.run_number }}.apk"
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          if [ -n "$RITMO_KEYSTORE_B64" ] && [ -n "$RITMO_KEYSTORE_PASSWORD" ]; then
+            echo "$RITMO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ritmo.jks"
+            BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+            "$BT/apksigner" sign --ks "$RUNNER_TEMP/ritmo.jks" --ks-key-alias ritmo \
+              --ks-pass env:RITMO_KEYSTORE_PASSWORD --key-pass env:RITMO_KEYSTORE_PASSWORD \
+              --out "$OUT" "$APK"
+            "$BT/apksigner" verify --print-certs "$OUT" | head -3
+            rm -f "$RUNNER_TEMP/ritmo.jks"
+          else
+            echo "::warning::Sin llave propia configurada: el APK queda firmado con la llave de pruebas."
+            cp "$APK" "$OUT"
+          fi
           ls -lh dist
 
       - uses: actions/upload-artifact@v5

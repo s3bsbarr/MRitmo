@@ -4,7 +4,11 @@ App de productividad para Android: planeas el día por tiempo, no por número de
 
 - **Hoy**: tareas con duración. El progreso se pondera por tiempo (una tarea de 2 h pesa más que una de 15 min). Las pendientes de días anteriores se pueden traer a hoy.
 - **Foco**: temporizador con la duración de cada tarea; sigue corriendo aunque salgas de la app.
-- **Resumen**: semana en barras, cumplimiento, compartir tu día y tema (sistema, claro u oscuro).
+- **Resumen**: semana en barras, cumplimiento y compartir tu día. El engranaje abre Configuración (nombre, personaje, tema, recordatorios).
+- **Personaje pixel art**: duerme al 0 %, despierta al empezar, se pone de pie al pasar la mitad y celebra al 100 %.
+- **Widgets**: *Estado* (personaje y avance, de 1×1 a 4×2) y *Foco* (iniciar, pausar o terminar la tarea sin abrir la app, 4×1 o 4×2).
+- **Temporizador en vivo**: notificación con cuenta regresiva que Android 16 / One UI 8 promueve a Live Update (Now Bar).
+- **Notificaciones**: aviso al terminar un bloque y recordatorios de mañana y noche.
 
 Diseño monocromo: blanco en modo claro, negro en modo oscuro, tipografía Inter con tracking ajustado por tamaño y barra flotante de vidrio (blur real).
 
@@ -15,6 +19,14 @@ Cada `push` a `main` compila el APK con GitHub Actions y lo publica en **Release
 1. En el celular, abre la pestaña **Releases** de este repositorio.
 2. Descarga `Ritmo-N.apk` de la versión más reciente.
 3. Ábrelo y permite "Instalar apps desconocidas" para tu navegador cuando Android lo pida.
+
+## Firma propia
+
+Si existen los secretos `RITMO_KEYSTORE_B64` y `RITMO_KEYSTORE_PASSWORD` en *Settings → Secrets and variables → Actions*, el APK se firma con la llave de Ritmo; si no, con la de pruebas.
+
+## Cuentas y amigos (siguiente fase)
+
+`supabase/schema.sql` crea perfiles, amistades, avance diario compartido y hábitos, con Row Level Security.
 
 ## Desarrollo
 

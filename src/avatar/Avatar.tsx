@@ -9,12 +9,7 @@ export type { Gender, Mood };
 export const SPRITE_W = 24;
 export const SPRITE_H = 26;
 
-/** Mood follows the day: relaxed below half, focused past half, flexing at 100%. */
-export function moodFor(ratio: number, hasTasks: boolean): Mood {
-  if (!hasTasks || ratio < 0.5) return 'calma';
-  if (ratio < 1) return 'foco';
-  return 'fuerza';
-}
+export { moodFor } from './mood';
 
 type Run = { x: number; y: number; w: number; color: string };
 
@@ -60,6 +55,7 @@ const enter = new Keyframe({
 }).duration(320);
 
 const LABEL: Record<Mood, string> = {
+  sueno: 'Tu personaje duerme: aún no empiezas el día',
   calma: 'Tu personaje está sentado, tranquilo',
   foco: 'Tu personaje está de pie, concentrado',
   fuerza: 'Tu personaje celebra con los brazos en alto',

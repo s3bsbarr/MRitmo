@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -19,8 +18,14 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
   const [title, setTitle] = useState('');
-  const [minutes, setMinutes] = useState(30);
+  const [hText, setHText] = useState('0');
+  const [mText, setMText] = useState('30');
   const input = useRef<TextInput>(null);
+  const minutes = clampInt(hText, 0, 23) * 60 + clampInt(mText, 0, 59);
+  const setMinutes = (total: number) => {
+    setHText(String(Math.floor(total / 60)));
+    setMText(String(total % 60));
+  };
 
   const y = useSharedValue(600);
   const scrim = useSharedValue(0);
@@ -29,7 +34,8 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
     if (visible) {
       setMounted(true);
       setTitle('');
-      setMinutes(30);
+      setHText('0');
+      setMText('30');
       // Sheet rises with the iOS sheet feel; no overshoot because no finger threw it.
       y.set(withSpring(0, { duration: 340, dampingRatio: 1 }));
       scrim.set(withTiming(1, { duration: 220, easing: EASE_OUT }));
@@ -48,17 +54,12 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrim.get() }));
 
-  const canAdd = title.trim().length > 0;
+  const canAdd = title.trim().length > 0 && minutes > 0;
   const submit = () => {
     if (!canAdd) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     onAdd(title, minutes);
     onClose();
-  };
-
-  const step = (delta: number) => {
-    Haptics.selectionAsync().catch(() => {});
-    setMinutes((m) => Math.min(480, Math.max(5, m + delta)));
   };
 
   return (
@@ -148,20 +149,16 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
               backgroundColor: c.surface,
               borderRadius: radius.md,
               paddingLeft: space.lg,
-              height: 52,
+              paddingRight: space.sm,
+              height: 56,
             }}
           >
             <Text style={[type.callout, { color: c.textSecondary }]}>Personalizada</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Press onPress={() => step(-5)} accessibilityLabel="Restar 5 minutos" style={{ width: 48, height: 52, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="remove" size={20} color={c.text} />
-              </Press>
-              <Text style={[type.headline, { color: c.text, minWidth: 84, textAlign: 'center', fontVariant: ['tabular-nums'] }]}>
-                {formatMinutes(minutes)}
-              </Text>
-              <Press onPress={() => step(5)} accessibilityLabel="Sumar 5 minutos" style={{ width: 48, height: 52, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="add" size={20} color={c.text} />
-              </Press>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+              <NumberField value={hText} onChange={setHText} max={23} label="Horas" />
+              <Text style={[type.callout, { color: c.textSecondary, marginRight: space.sm }]}>h</Text>
+              <NumberField value={mText} onChange={setMText} max={59} label="Minutos" />
+              <Text style={[type.callout, { color: c.textSecondary, marginRight: space.xs }]}>min</Text>
             </View>
           </View>
 
@@ -179,10 +176,51 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
               justifyContent: 'center',
             }}
           >
-            <Text style={[type.headline, { color: c.inkOnInk }]}>Agregar a hoy</Text>
+            <Text style={[type.headline, { color: c.inkOnInk }]}>{minutes > 0 ? `Agregar · ${formatMinutes(minutes)}` : 'Agregar a hoy'}</Text>
           </Press>
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
+  );
+}
+
+function clampInt(text: string, min: number, max: number) {
+  const n = parseInt(text, 10);
+  if (Number.isNaN(n)) return 0;
+  return Math.min(max, Math.max(min, n));
+}
+
+/** Free numeric entry: any hour from 0 to 23 and any minute from 0 to 59. */
+function NumberField({ value, onChange, max, label }: { value: string; onChange: (v: string) => void; max: number; label: string }) {
+  const { c } = useTheme();
+  return (
+    <TextInput
+      value={value}
+      onChangeText={(t) => {
+        const digits = t.replace(/[^0-9]/g, '').slice(0, 2);
+        onChange(digits === '' ? '' : String(Math.min(max, parseInt(digits, 10))));
+      }}
+      onBlur={() => value === '' && onChange('0')}
+      keyboardType="number-pad"
+      inputMode="numeric"
+      selectTextOnFocus
+      maxLength={2}
+      accessibilityLabel={label}
+      selectionColor={c.ink}
+      cursorColor={c.ink}
+      style={{
+        fontFamily: font.semibold,
+        fontSize: 18,
+        letterSpacing: -0.3,
+        color: c.text,
+        backgroundColor: c.bg,
+        borderRadius: radius.sm,
+        width: 52,
+        height: 40,
+        textAlign: 'center',
+        paddingVertical: 0,
+        fontVariant: ['tabular-nums'],
+      }}
+    />
   );
 }

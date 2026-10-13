@@ -10,15 +10,9 @@ import { formatClock, formatShort } from '../format';
 import { TasksApi } from '../store';
 import { radius, space, type, useTheme } from '../theme';
 
-export type FocusState = {
-  taskId: string | null;
-  /** Epoch ms when the countdown hits zero while running; null when paused. */
-  endsAt: number | null;
-  /** Remaining ms while paused. */
-  remaining: number;
-};
-
-export const emptyFocus: FocusState = { taskId: null, endsAt: null, remaining: 0 };
+export { emptyFocus } from '../data';
+export type { FocusState } from '../data';
+import type { FocusState } from '../data';
 
 type Props = { api: TasksApi; focus: FocusState; setFocus: (f: FocusState) => void };
 
