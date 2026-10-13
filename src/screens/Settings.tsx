@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../avatar/Avatar';
 import { Press } from '../components/Press';
 import { TimeField } from '../components/TimeField';
+import RitmoLive, { type LiveDiagnosis } from '../../modules/ritmo-live/src/RitmoLiveModule';
 import { hhmmLabel } from '../format';
 import type { Gender, Settings as SettingsT, ThemePref } from '../data';
 import { requestNotificationPermission } from '../effects';
@@ -84,6 +85,78 @@ function TimedToggle({ label, detail, on, time, onToggle, onTime }: { label: str
         </View>
       )}
     </View>
+  );
+}
+
+/** Shows what Android decided about the focus timer and links to the per-app Live Updates switch. */
+function LiveSection() {
+  const { c } = useTheme();
+  const [d, setD] = useState<LiveDiagnosis | null>(null);
+  const refresh = () => {
+    try {
+      setD(RitmoLive?.diagnose() ?? null);
+    } catch {
+      setD(null);
+    }
+  };
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  const yes = (v: boolean | null | undefined, ok: string, no: string, unknown = '—') => (v === null || v === undefined ? unknown : v ? ok : no);
+  const rows: [string, string][] = d
+    ? d.sdk < 36
+      ? [['Android', `Versión ${d.sdk}: no tiene Live Updates`]]
+      : [
+          ['Permitido por el sistema', yes(d.canPost, 'Sí', 'No: actívalo abajo')],
+          ['Temporizador visible', d.active ? 'Sí' : 'No hay foco en curso'],
+          ['Cumple los requisitos', yes(d.promotable, 'Sí', 'No', d.active ? '—' : 'Inicia un foco')],
+          ['Promovido a Live Update', d.active ? yes(d.promoted, 'Sí', 'No') : '—'],
+        ]
+    : [];
+
+  return (
+    <Section
+      title="Temporizador en vivo"
+      note="Con un foco en curso, el temporizador debe aparecer en la barra de estado y en la Now Bar. Si dice “No” en Promovido, envía una captura de esta sección."
+    >
+      <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+        {rows.map(([label, value], i) => (
+          <View
+            key={label}
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              minHeight: 48,
+              marginLeft: space.lg,
+              paddingRight: space.lg,
+              borderBottomWidth: 1,
+              borderBottomColor: c.separator,
+            }}
+          >
+            <Text style={[type.callout, { color: c.text }]}>{label}</Text>
+            <Text style={[type.callout, { color: c.textSecondary, flexShrink: 1, textAlign: 'right', marginLeft: space.md }]}>{value}</Text>
+          </View>
+        ))}
+        <Press
+          onPress={() => {
+            try {
+              RitmoLive?.openPromotionSettings();
+            } catch {}
+          }}
+          scaleTo={0.99}
+          accessibilityRole="button"
+          style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md }}
+        >
+          <Ionicons name="radio-outline" size={20} color={c.text} />
+          <Text style={[type.body, { color: c.text, flex: 1 }]}>Ajustes de Live Updates de Ritmo</Text>
+          <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
+        </Press>
+      </View>
+    </Section>
   );
 }
 
@@ -364,6 +437,8 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
           </View>
         </Section>
 
+        {Platform.OS === 'android' && RitmoLive && <LiveSection />}
+
         {Platform.OS === 'android' && (
           <Section title="Widgets">
             <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, gap: space.md }}>
@@ -376,7 +451,7 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
           </Section>
         )}
 
-        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.3</Text>
+        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.4</Text>
       </ScrollView>
     </View>
   );

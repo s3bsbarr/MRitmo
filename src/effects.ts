@@ -148,9 +148,10 @@ export function syncFocus(focus: FocusState, tasks: Task[]) {
   if (!native) return;
   const task = tasks.find((t) => t.id === focus.taskId && !t.done) ?? null;
   const remaining = task ? remainingOf(focus) : 0;
+  const total = focus.total ?? (task ? task.minutes * 60_000 : 0);
   try {
-    if (task && focus.endsAt !== null && remaining > 0) RitmoLive?.start(task.title, focus.endsAt);
-    else if (task && focus.started && remaining > 0) RitmoLive?.pause(task.title, remaining);
+    if (task && focus.endsAt !== null && remaining > 0) RitmoLive?.start(task.title, focus.endsAt, total);
+    else if (task && focus.started && remaining > 0) RitmoLive?.pause(task.title, remaining, total);
     else RitmoLive?.stop();
   } catch {}
 }
