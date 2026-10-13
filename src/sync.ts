@@ -40,6 +40,7 @@ const MESSAGES: [RegExp, string][] = [
   [/invalid email|unable to validate email/i, 'Ese correo no parece válido.'],
   [/rate limit|too many/i, 'Demasiados intentos. Espera un momento y vuelve a intentarlo.'],
   [/network|fetch/i, 'Sin conexión. Revisa tu internet e inténtalo de nuevo.'],
+  [/signups not allowed|user not found|otp/i, 'No hay una cuenta con ese correo. Crea una primero.'],
 ];
 
 export function friendlyError(e: unknown) {
@@ -72,6 +73,15 @@ export async function signUp(email: string, password: string): Promise<'signed-i
 
 export async function signIn(email: string, password: string) {
   const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+  if (error) throw error;
+}
+
+/** Passwordless: a one-tap sign-in link sent to the email of an existing account. */
+export async function signInWithLink(email: string) {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: { emailRedirectTo: AUTH_REDIRECT, shouldCreateUser: false },
+  });
   if (error) throw error;
 }
 

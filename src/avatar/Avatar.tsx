@@ -1,8 +1,9 @@
-import { memo, useMemo } from 'react';
-import { View } from 'react-native';
-import Animated, { Keyframe } from 'react-native-reanimated';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
+import Animated, { Easing, Keyframe, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import * as Haptics from '../haptics';
 import { useTheme } from '../theme';
-import { Gender, Mood, SPRITE_COLORS, SPRITES } from './sprites';
+import { Gender, Mood, SMILES, SPRITE_COLORS, SPRITES } from './sprites';
 
 export type { Gender, Mood };
 
@@ -61,14 +62,64 @@ const LABEL: Record<Mood, string> = {
   fuerza: 'Tu personaje celebra con los brazos en alto',
 };
 
-export function Avatar({ gender, mood, px = 4 }: { gender: Gender; mood: Mood; px?: number }) {
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+
+/**
+ * The pixel character. With `interactive`, a tap makes it hop and grin for a
+ * moment: a small delight, so it springs with a little bounce (the tap carried
+ * intent), and it collapses to just the grin under Reduce Motion.
+ */
+export function Avatar({
+  gender,
+  mood,
+  px = 4,
+  interactive = false,
+  still = false,
+}: {
+  gender: Gender;
+  mood: Mood;
+  px?: number;
+  interactive?: boolean;
+  /** In lists: no entrance animation (it misbehaves inside scrolling rows). */
+  still?: boolean;
+}) {
   const { c } = useTheme();
   const palette = SPRITE_COLORS[c.scheme] as Record<string, string>;
-  return (
-    <View accessible accessibilityRole="image" accessibilityLabel={LABEL[mood]} style={{ width: SPRITE_W * px, height: SPRITE_H * px }}>
-      <Animated.View key={`${gender}-${mood}`} entering={enter}>
-        <Sprite rows={SPRITES[gender][mood]} palette={palette} px={px} />
+  const reduced = useReducedMotion();
+  const [smiling, setSmiling] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const y = useSharedValue(0);
+  const hop = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  const tap = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setSmiling(true);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSmiling(false), 1100);
+    if (!reduced) {
+      y.set(withSequence(withTiming(-px * 4, { duration: 150, easing: EASE_OUT }), withSpring(0, { duration: 420, dampingRatio: 0.55 })));
+    }
+  };
+
+  const body = (
+    <View accessible accessibilityRole={interactive ? 'button' : 'image'} accessibilityLabel={LABEL[mood]} style={{ width: SPRITE_W * px, height: SPRITE_H * px }}>
+      <Animated.View style={hop}>
+        <Animated.View key={`${gender}-${mood}`} entering={still ? undefined : enter}>
+          <Sprite rows={(smiling ? SMILES : SPRITES)[gender][mood]} palette={palette} px={px} />
+        </Animated.View>
       </Animated.View>
     </View>
+  );
+
+  return interactive ? (
+    <Pressable onPress={tap} hitSlop={8} android_ripple={null} accessibilityHint="Toca para saludar">
+      {body}
+    </Pressable>
+  ) : (
+    body
   );
 }

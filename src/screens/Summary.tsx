@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../haptics';
 import { ScrollView, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAV_HEIGHT } from '../components/NavBar';
@@ -58,7 +58,10 @@ export function Summary({ api, habits, name, onOpenSettings }: { api: TasksApi; 
           Resumen
         </Text>
         <Press
-          onPress={onOpenSettings}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+            onOpenSettings();
+          }}
           accessibilityRole="button"
           accessibilityLabel="Configuración"
           scaleTo={0.9}

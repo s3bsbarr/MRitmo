@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../haptics';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
-import { friendlyError, resetPassword, signIn, signUp } from '../sync';
+import { friendlyError, resetPassword, signIn, signInWithLink, signUp } from '../sync';
 import { font, radius, space, type, useTheme } from '../theme';
 import { Press } from './Press';
 import { Sheet } from './Sheet';
@@ -62,6 +62,23 @@ export function AuthSheet({
       onClose();
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      setError(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendLink = async () => {
+    if (!/\S+@\S+\.\S+/.test(email.trim())) {
+      setError('Escribe tu correo arriba y vuelve a tocar "Entrar sin contraseña".');
+      return;
+    }
+    setBusy(true);
+    try {
+      await signInWithLink(email);
+      setError(null);
+      setNotice(`Te enviamos un enlace a ${email.trim()}. Ábrelo desde este teléfono y entras directo.`);
+    } catch (e) {
       setError(friendlyError(e));
     } finally {
       setBusy(false);
@@ -203,9 +220,20 @@ export function AuthSheet({
       </Press>
 
       {mode === 'signin' && (
-        <Press onPress={forgot} style={{ alignSelf: 'center', padding: space.sm, marginTop: space.sm }}>
-          <Text style={[type.callout, { color: c.textSecondary }]}>Olvidé mi contraseña</Text>
-        </Press>
+        <>
+          <Press
+            onPress={sendLink}
+            disabled={busy}
+            accessibilityRole="button"
+            style={{ marginTop: space.md, height: 50, borderRadius: radius.pill, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm }}
+          >
+            <Ionicons name="link-outline" size={18} color={c.text} />
+            <Text style={[type.headline, { color: c.text }]}>Entrar sin contraseña</Text>
+          </Press>
+          <Press onPress={forgot} style={{ alignSelf: 'center', padding: space.sm, marginTop: space.xs }}>
+            <Text style={[type.callout, { color: c.textSecondary }]}>Olvidé mi contraseña</Text>
+          </Press>
+        </>
       )}
     </Sheet>
   );

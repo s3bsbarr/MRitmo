@@ -8,14 +8,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { applyAction, resyncAll } from './src/actions';
-import { AddSheet, NewItem } from './src/components/AddSheet';
+import { ActionsSheet, ItemActions } from './src/components/ActionsSheet';
+import { AddSheet, Editing, NewItem } from './src/components/AddSheet';
 import { AuthSheet } from './src/components/AuthSheet';
 import { ConfirmRequest, ConfirmSheet } from './src/components/ConfirmSheet';
 import { BlurTargetContext } from './src/components/Glass';
 import { NavBar, Tab } from './src/components/NavBar';
-import { defaultSettings, emptyFocus, FocusState, loadFocus, loadMeta, loadSettings, saveFocus, saveSettings, Settings, ThemePref } from './src/data';
+import { defaultSettings, emptyFocus, FocusState, loadFocus, loadMeta, loadSettings, progressOf, saveFocus, saveSettings, Settings, ThemePref } from './src/data';
 import { configureNotifications, onAppBackground, onAppForeground, requestNotificationPermission } from './src/effects';
 import { Focus } from './src/screens/Focus';
+import { Friends } from './src/screens/Friends';
+import { publishProgress, syncProfile } from './src/friends';
 import { AccountInfo, SettingsScreen } from './src/screens/Settings';
 import { Summary } from './src/screens/Summary';
 import { Today } from './src/screens/Today';
@@ -38,6 +41,8 @@ export default function App() {
   const [adding, setAdding] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [actions, setActions] = useState<ItemActions | null>(null);
+  const [editing, setEditing] = useState<Editing>(null);
   const [focus, setFocusState] = useState<FocusState>(emptyFocus);
   const target = useRef<View>(null);
   const [account, setAccount] = useState<AccountInfo>({ email: null, syncing: false });
@@ -115,6 +120,24 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, [runSync]);
 
+  // Today's progress, shared with friends (only minutes, never task titles).
+  const today = progressOf(api.todayTasks);
+  const focusTask = api.tasks.find((t) => t.id === focus.taskId && !t.done);
+  const focusUntil = focusTask && focus.endsAt !== null && focus.endsAt > Date.now() ? focus.endsAt : null;
+  const mine = { done: today.done, total: today.total, focusUntil };
+
+  useEffect(() => {
+    if (!ready || !account.email) return;
+    const id = setTimeout(() => publishProgress(mine.done, mine.total, mine.focusUntil), 1500);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, account.email, mine.done, mine.total, mine.focusUntil]);
+
+  useEffect(() => {
+    if (!ready || !account.email) return;
+    syncProfile(settings.name, settings.gender).catch(() => {});
+  }, [ready, account.email, settings.name, settings.gender]);
+
   // Back up a few seconds after any change, when signed in.
   useEffect(() => {
     if (!ready || !account.email) return;
@@ -149,6 +172,7 @@ export default function App() {
     const path = url.replace(/^ritmo:\/\//, '').split(/[?#/]/)[0];
     setShowSettings(false);
     if (path === 'foco') setTab('foco');
+    else if (path === 'amigos') setTab('amigos');
     else if (path === 'resumen') setTab('resumen');
     else if (path === 'nueva') {
       setTab('hoy');
@@ -248,12 +272,37 @@ export default function App() {
                   onAdd={() => setAdding(true)}
                   onFocus={openFocus}
                   onConfirm={setConfirm}
+                  onActions={setActions}
+                  onEdit={(e) => {
+                    setEditing(e);
+                    setAdding(true);
+                  }}
                 />
               )}
               {tab === 'foco' && <Focus api={api} focus={focus} setFocus={setFocus} />}
+              {tab === 'amigos' && (
+                <Friends
+                  signedIn={Boolean(account.email)}
+                  name={settings.name}
+                  gender={settings.gender}
+                  mine={mine}
+                  onAuth={(m) => setAuthMode(m)}
+                  onConfirm={setConfirm}
+                  onProfileReady={() => publishProgress(mine.done, mine.total, mine.focusUntil)}
+                />
+              )}
               {tab === 'resumen' && <Summary api={api} habits={habitsApi.habits} name={settings.name} onOpenSettings={() => setShowSettings(true)} />}
             </BlurTargetView>
-            {!showSettings && <NavBar tab={tab} onTab={setTab} onAdd={() => setAdding(true)} />}
+            {!showSettings && (
+              <NavBar
+                tab={tab}
+                onTab={setTab}
+                onAdd={() => {
+                  setEditing(null);
+                  setAdding(true);
+                }}
+              />
+            )}
             {showSettings && (
               <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                 <SettingsScreen
@@ -279,7 +328,20 @@ export default function App() {
                 />
               </View>
             )}
-            <AddSheet visible={adding} onClose={() => setAdding(false)} onAdd={onAdd} />
+            <AddSheet
+              visible={adding}
+              editing={editing}
+              onClose={() => {
+                setAdding(false);
+                setTimeout(() => setEditing(null), 260);
+              }}
+              onAdd={onAdd}
+              onSave={(id, item) => {
+                if (item.kind === 'habit') habitsApi.update(id, { title: item.title, time: item.time });
+                else api.update(id, { title: item.title, minutes: item.minutes, day: item.day, at: item.at });
+              }}
+            />
+            <ActionsSheet request={actions} onClose={() => setActions(null)} />
             <ConfirmSheet request={confirm} onClose={() => setConfirm(null)} />
             <AuthSheet visible={authMode !== null} initialMode={authMode ?? 'signup'} onClose={() => setAuthMode(null)} onSignedIn={runSync} />
             <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />

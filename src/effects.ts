@@ -29,10 +29,14 @@ const isAndroid = Platform.OS === 'android';
 
 export const CH = {
   focusEnd: 'ritmo_focus_end_v2',
-  tasks: 'ritmo_tasks',
-  reminders: 'ritmo_reminders',
-  motivation: 'ritmo_motivation',
+  tasks: 'ritmo_tasks_v2',
+  reminders: 'ritmo_reminders_v2',
+  motivation: 'ritmo_motivation_v2',
 };
+
+/** Channels from earlier versions. A channel's sound cannot change, so they are replaced. */
+const OLD_CHANNELS = ['ritmo_tasks', 'ritmo_reminders', 'ritmo_motivation', 'ritmo_focus_end'];
+const SOFT = 'ritmo_soft.wav';
 
 export const CAT = {
   focus: 'ritmo_focus',
@@ -63,6 +67,7 @@ function setup() {
   if (setupDone) return setupDone;
   setupDone = (async () => {
     if (isAndroid) {
+      for (const id of OLD_CHANNELS) await Notifications.deleteNotificationChannelAsync(id).catch(() => {});
       await Notifications.setNotificationChannelAsync(CH.focusEnd, {
         name: 'Fin de bloque',
         description: 'Cuando se cumple el tiempo de la tarea en foco, con sonido.',
@@ -74,16 +79,19 @@ function setup() {
         name: 'Tareas',
         description: 'Tareas que están por empezar o que no empezaron a tiempo.',
         importance: Notifications.AndroidImportance.HIGH,
+        sound: SOFT,
       }).catch(() => {});
       await Notifications.setNotificationChannelAsync(CH.reminders, {
         name: 'Recordatorios',
         description: 'Planear el día, cerrarlo, días libres y hábitos.',
         importance: Notifications.AndroidImportance.DEFAULT,
+        sound: SOFT,
       }).catch(() => {});
       await Notifications.setNotificationChannelAsync(CH.motivation, {
         name: 'Motivación',
         description: 'Un mensaje por la mañana y al cerrar un día completo.',
         importance: Notifications.AndroidImportance.DEFAULT,
+        sound: SOFT,
       }).catch(() => {});
     }
     const bg = { opensAppToForeground: false };

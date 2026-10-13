@@ -170,6 +170,8 @@ class RitmoLiveModule : Module() {
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setColorized(false)
+      // Accent for the status chip, Now Bar and progress: white instead of the system blue.
+      .setColor(Color.WHITE)
       .setCategory(Notification.CATEGORY_PROGRESS)
       .setVisibility(Notification.VISIBILITY_PUBLIC)
 

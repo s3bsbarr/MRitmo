@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../haptics';
 import { Text, View } from 'react-native';
 import { radius, space, type, useTheme } from '../theme';
 import { Press } from './Press';
@@ -56,7 +56,8 @@ export function ConfirmSheet({ request, onClose }: { request: ConfirmRequest | n
             </Press>
             <Press
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                if (request.destructive) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+                else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
                 request.onConfirm();
                 onClose();
               }}

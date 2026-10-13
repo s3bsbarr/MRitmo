@@ -51,6 +51,12 @@ export function useTasks() {
     [commit],
   );
 
+  const update = useCallback(
+    (id: string, patch: Partial<Pick<Task, 'title' | 'minutes' | 'day' | 'at'>>) =>
+      commit((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch, title: (patch.title ?? t.title).trim() } : t))),
+    [commit],
+  );
+
   const complete = useCallback(
     (id: string) => commit((prev) => prev.map((t) => (t.id === id ? { ...t, done: true, doneAt: Date.now() } : t))),
     [commit],
@@ -85,7 +91,7 @@ export function useTasks() {
     [tasks, today],
   );
 
-  return { ready, today, tasks, todayTasks, upcoming, carryover, week, add, toggle, complete, remove, carryIntoToday, reload };
+  return { ready, today, tasks, todayTasks, upcoming, carryover, week, add, update, toggle, complete, remove, carryIntoToday, reload };
 }
 
 export type TasksApi = ReturnType<typeof useTasks>;
@@ -118,6 +124,12 @@ export function useHabits() {
     [commit],
   );
 
+  const update = useCallback(
+    (id: string, patch: Partial<Pick<Habit, 'title' | 'time'>>) =>
+      commit((prev) => prev.map((h) => (h.id === id ? { ...h, ...patch, title: (patch.title ?? h.title).trim() } : h))),
+    [commit],
+  );
+
   const toggleToday = useCallback(
     (id: string) => {
       const today = dayKey();
@@ -138,7 +150,7 @@ export function useHabits() {
     [commit],
   );
 
-  return { ready, habits, add, toggleToday, remove, reload };
+  return { ready, habits, add, update, toggleToday, remove, reload };
 }
 
 export type HabitsApi = ReturnType<typeof useHabits>;

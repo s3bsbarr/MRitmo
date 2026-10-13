@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Avatar, Gender, moodFor } from '../avatar/Avatar';
@@ -8,6 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAV_HEIGHT } from '../components/NavBar';
 import { Press } from '../components/Press';
 import { ProgressBar } from '../components/ProgressBar';
+import type { ItemActions } from '../components/ActionsSheet';
+import type { Editing } from '../components/AddSheet';
 import type { ConfirmRequest } from '../components/ConfirmSheet';
 import { CheckRow, TaskRow } from '../components/TaskRow';
 import { streakOf } from '../data';
@@ -23,6 +25,8 @@ type Props = {
   onAdd: () => void;
   onFocus: (id: string) => void;
   onConfirm: (r: ConfirmRequest) => void;
+  onActions: (r: ItemActions) => void;
+  onEdit: (e: Editing) => void;
 };
 
 function SectionHeader({ title, count }: { title: string; count?: string }) {
@@ -35,12 +39,28 @@ function SectionHeader({ title, count }: { title: string; count?: string }) {
   );
 }
 
-export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm }: Props) {
+export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm, onActions, onEdit }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { todayTasks, carryover, upcoming } = api;
   const { habits } = habitsApi;
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+
+  const taskActions = (t: Task) =>
+    onActions({
+      title: t.title,
+      detail: `${formatMinutes(t.minutes)}${t.at ? ` · ${dayChip(t.day, api.today)} ${timeLabel(t.at)}` : ''}`,
+      onEdit: () => onEdit({ kind: 'task', task: t }),
+      onDelete: () => askRemoveTask(t),
+    });
+
+  const habitActions = (h: Habit) =>
+    onActions({
+      title: h.title,
+      detail: `Hábito diario${h.time ? ` · ${hhmmLabel(h.time)}` : ''}`,
+      onEdit: () => onEdit({ kind: 'habit', habit: h }),
+      onDelete: () => askRemoveHabit(h),
+    });
 
   const askRemoveTask = (t: Task) =>
     onConfirm({
@@ -91,7 +111,7 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm 
           </Text>
           <Text style={[type.callout, { color: c.textSecondary, marginTop: 2 }]}>{longDate(api.today)}</Text>
         </View>
-        <Avatar gender={gender} mood={mood} px={4} />
+        <Avatar gender={gender} mood={mood} px={4} interactive />
       </View>
 
       {todayTasks.length > 0 && (
@@ -175,7 +195,7 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm 
           <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {todayTasks.map((t, i) => (
               <Animated.View key={t.id} entering={FadeIn.duration(200)} layout={LinearTransition.duration(240)}>
-                <TaskRow task={t} last={i === todayTasks.length - 1} onToggle={api.toggle} onRequestRemove={askRemoveTask} onFocus={onFocus} />
+                <TaskRow task={t} last={i === todayTasks.length - 1} onToggle={api.toggle} onRequestRemove={taskActions} onFocus={onFocus} />
               </Animated.View>
             ))}
           </View>
@@ -199,7 +219,7 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm 
                     last={i === habits.length - 1}
                     checkLabel={checked ? `Desmarcar ${h.title}` : `Marcar ${h.title} como hecho hoy`}
                     onToggle={() => habitsApi.toggleToday(h.id)}
-                    onLongPress={() => askRemoveHabit(h)}
+                    onLongPress={() => habitActions(h)}
                     right={<Streak n={streak} lit={checked} />}
                   />
                 </Animated.View>
@@ -220,7 +240,7 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm 
                 meta={`${dayChip(t.day, api.today)}${t.at ? ` · ${timeLabel(t.at)}` : ''}`}
                 last={i === list.length - 1}
                 onToggle={api.toggle}
-                onRequestRemove={askRemoveTask}
+                onRequestRemove={taskActions}
                 onFocus={onFocus}
               />
             ))}
@@ -235,7 +255,7 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm 
 
       {(todayTasks.length > 0 || habits.length > 0) && (
         <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.lg, textAlign: 'center' }]}>
-          Toca una tarea para enfocarte. Mantén presionado para eliminar.
+          Toca una tarea para enfocarte. Mantén presionado para editar o eliminar.
         </Text>
       )}
     </ScrollView>

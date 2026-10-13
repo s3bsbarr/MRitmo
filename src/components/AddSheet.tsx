@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { atTime, dayKey, shiftDay } from '../data';
+import { atTime, dayKey, shiftDay, type Habit, type Task } from '../data';
 import { dayChip, formatMinutes, hhmmLabel } from '../format';
 import { font, radius, space, type, useTheme } from '../theme';
 import { Press } from './Press';
@@ -16,7 +16,16 @@ export type NewItem =
   | { kind: 'task'; title: string; minutes: number; day: string; at?: number }
   | { kind: 'habit'; title: string; time?: string };
 
-type Props = { visible: boolean; onClose: () => void; onAdd: (item: NewItem) => void };
+/** When set, the sheet edits this item instead of creating a new one. */
+export type Editing = { kind: 'task'; task: Task } | { kind: 'habit'; habit: Habit } | null;
+
+type Props = {
+  visible: boolean;
+  onClose: () => void;
+  onAdd: (item: NewItem) => void;
+  editing?: Editing;
+  onSave?: (id: string, item: NewItem) => void;
+};
 
 /** Next half hour from now, "HH:MM". */
 function nextSlot() {
@@ -53,7 +62,7 @@ function Pill({ label, active, onPress }: { label: string; active: boolean; onPr
   );
 }
 
-export function AddSheet({ visible, onClose, onAdd }: Props) {
+export function AddSheet({ visible, onClose, onAdd, editing = null, onSave }: Props) {
   const { c } = useTheme();
   const input = useRef<TextInput>(null);
   const today = dayKey();
@@ -69,15 +78,39 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
 
   useEffect(() => {
     if (!visible) return;
+    setWhenOpen(false);
+    if (editing?.kind === 'task') {
+      const t = editing.task;
+      setTitle(t.title);
+      setHText(String(Math.floor(t.minutes / 60)));
+      setMText(String(t.minutes % 60));
+      setHabit(false);
+      setDay(t.day < dayKey() ? dayKey() : t.day);
+      setHasTime(Boolean(t.at));
+      if (t.at) {
+        const d = new Date(t.at);
+        setTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+      } else setTime(nextSlot());
+      return;
+    }
+    if (editing?.kind === 'habit') {
+      setTitle(editing.habit.title);
+      setHabit(true);
+      setHasTime(Boolean(editing.habit.time));
+      setTime(editing.habit.time ?? '21:00');
+      return;
+    }
     setTitle('');
     setHText('0');
     setMText('30');
     setHabit(false);
-    setWhenOpen(false);
     setDay(dayKey());
     setHasTime(false);
     setTime(nextSlot());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
+
+  const isEditing = editing !== null;
 
   const minutes = clampInt(hText, 0, 23) * 60 + clampInt(mText, 0, 59);
   const setMinutes = (total: number) => {
@@ -97,9 +130,12 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
   const canAdd = title.trim().length > 0 && (habit || minutes > 0);
   const submit = () => {
     if (!canAdd) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    if (habit) onAdd({ kind: 'habit', title: title.trim(), time: hasTime ? time : undefined });
-    else onAdd({ kind: 'task', title: title.trim(), minutes, day, at: hasTime ? atTime(day, time) : undefined });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    const item: NewItem = habit
+      ? { kind: 'habit', title: title.trim(), time: hasTime ? time : undefined }
+      : { kind: 'task', title: title.trim(), minutes, day, at: hasTime ? atTime(day, time) : undefined };
+    if (editing && onSave) onSave(editing.kind === 'task' ? editing.task.id : editing.habit.id, item);
+    else onAdd(item);
     onClose();
   };
 
@@ -108,7 +144,9 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
   return (
     <Sheet visible={visible} onClose={onClose} onOpened={() => input.current?.focus()}>
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={[type.title, { color: c.text, marginBottom: space.lg }]}>{habit ? 'Nuevo hábito' : 'Nueva tarea'}</Text>
+        <Text style={[type.title, { color: c.text, marginBottom: space.lg }]}>
+          {isEditing ? (habit ? 'Editar hábito' : 'Editar tarea') : habit ? 'Nuevo hábito' : 'Nueva tarea'}
+        </Text>
 
         <TextInput
           ref={input}
@@ -134,6 +172,7 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
           }}
         />
 
+        {!isEditing && (
         <Press
           onPress={() => {
             Haptics.selectionAsync().catch(() => {});
@@ -163,6 +202,7 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
             <Text style={[type.footnote, { color: c.textSecondary }]}>Se vuelve un hábito con racha. No cuenta en el % del día.</Text>
           </View>
         </Press>
+        )}
 
         {!habit && (
           <Animated.View entering={FadeIn.duration(180)}>
@@ -251,7 +291,13 @@ export function AddSheet({ visible, onClose, onAdd }: Props) {
           }}
         >
           <Text style={[type.headline, { color: c.inkOnInk }]}>
-            {habit ? 'Crear hábito' : minutes > 0 ? `${isNow ? 'Agregar' : 'Programar'} · ${formatMinutes(minutes)}` : 'Agregar'}
+            {isEditing
+              ? 'Guardar cambios'
+              : habit
+                ? 'Crear hábito'
+                : minutes > 0
+                  ? `${isNow ? 'Agregar' : 'Programar'} · ${formatMinutes(minutes)}`
+                  : 'Agregar'}
           </Text>
         </Press>
       </ScrollView>

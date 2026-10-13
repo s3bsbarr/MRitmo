@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../haptics';
 import { Pressable, Text, View } from 'react-native';
 import { formatShort, timeLabel } from '../format';
 import type { Task } from '../store';
@@ -28,7 +28,8 @@ export function CheckRow({ checked, title, meta, right, last, checkLabel, square
     <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 60 }}>
       <Press
         onPress={() => {
-          if (!checked) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          if (!checked) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          else Haptics.selectionAsync().catch(() => {});
           onToggle();
         }}
         scaleTo={0.88}

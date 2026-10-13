@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ritmo",
     "slug": "ritmo",
-    "version": "1.4",
+    "version": "1.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -55,9 +55,10 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#0A0A0B",
-          "defaultChannel": "ritmo_reminders",
+          "defaultChannel": "ritmo_reminders_v2",
           "sounds": [
-            "./assets/sounds/ritmo_chime.wav"
+            "./assets/sounds/ritmo_chime.wav",
+            "./assets/sounds/ritmo_soft.wav"
           ]
         }
       ],
