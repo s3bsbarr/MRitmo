@@ -10,7 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { applyAction, resyncAll } from './src/actions';
 import { ActionsSheet, ItemActions } from './src/components/ActionsSheet';
 import { AddSheet, Editing, NewItem } from './src/components/AddSheet';
-import { AuthSheet } from './src/components/AuthSheet';
+import { AuthSheet, AuthStep } from './src/components/AuthSheet';
 import { ConfirmRequest, ConfirmSheet } from './src/components/ConfirmSheet';
 import { BlurTargetContext } from './src/components/Glass';
 import { NavBar, Tab } from './src/components/NavBar';
@@ -18,7 +18,8 @@ import { defaultSettings, emptyFocus, FocusState, loadFocus, loadMeta, loadSetti
 import { configureNotifications, onAppBackground, onAppForeground, requestNotificationPermission } from './src/effects';
 import { Focus } from './src/screens/Focus';
 import { Friends } from './src/screens/Friends';
-import { publishProgress, syncProfile } from './src/friends';
+import { historyOf, publishProgress, syncProfile } from './src/friends';
+import { PushStatus, registerPush, savePushPrefs, unregisterPush } from './src/push';
 import { AccountInfo, SettingsScreen } from './src/screens/Settings';
 import { Summary } from './src/screens/Summary';
 import { Today } from './src/screens/Today';
@@ -47,6 +48,10 @@ export default function App() {
   const target = useRef<View>(null);
   const [account, setAccount] = useState<AccountInfo>({ email: null, syncing: false });
   const [authMode, setAuthMode] = useState<'signup' | 'signin' | null>(null);
+  const [authStep, setAuthStep] = useState<AuthStep>('form');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [push, setPush] = useState<PushStatus>({ state: 'checking' });
+  const [openFriendId, setOpenFriendId] = useState<string | null>(null);
 
   const snapRef = useRef({ tasks: api.tasks, habits: habitsApi.habits, focus, settings });
   snapRef.current = { tasks: api.tasks, habits: habitsApi.habits, focus, settings };
@@ -125,13 +130,36 @@ export default function App() {
   const focusTask = api.tasks.find((t) => t.id === focus.taskId && !t.done);
   const focusUntil = focusTask && focus.endsAt !== null && focus.endsAt > Date.now() ? focus.endsAt : null;
   const mine = { done: today.done, total: today.total, focusUntil };
+  // Your recent days as friends see them (minutes only). The key keeps the effect quiet when nothing changed.
+  const history = useMemo(() => historyOf(api.tasks, undefined, api.today), [api.tasks, api.today]);
+  const historyKey = useMemo(() => history.map((d) => `${d.day}:${d.done}/${d.total}`).join(','), [history]);
+  const historyRef = useRef(history);
+  historyRef.current = history;
 
   useEffect(() => {
     if (!ready || !account.email) return;
-    const id = setTimeout(() => publishProgress(mine.done, mine.total, mine.focusUntil), 1500);
+    const id = setTimeout(() => publishProgress(mine, historyRef.current), 1500);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, account.email, mine.done, mine.total, mine.focusUntil]);
+  }, [ready, account.email, mine.done, mine.total, mine.focusUntil, historyKey]);
+
+  // Server push: register this phone under the account and keep the server's switch in step with Settings.
+  const refreshPush = useCallback(async (force = false) => {
+    setPush(await registerPush(force));
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !account.email) {
+      setPush({ state: account.email ? 'checking' : 'signed-out' });
+      return;
+    }
+    refreshPush();
+  }, [ready, account.email, refreshPush]);
+
+  useEffect(() => {
+    if (!ready || !account.email) return;
+    savePushPrefs({ friends: settings.remindFriends }).catch(() => {});
+  }, [ready, account.email, settings.remindFriends]);
 
   useEffect(() => {
     if (!ready || !account.email) return;
@@ -151,28 +179,41 @@ export default function App() {
       if (state === 'active') {
         await onAppForeground();
         await reloadAll();
-        if (await getSession()) runSync();
+        if (await getSession()) {
+          runSync();
+          refreshPush();
+        }
       } else if (state === 'background') {
         onAppBackground(snapRef.current);
       }
     });
     return () => sub.remove();
-  }, [reloadAll, runSync]);
+  }, [reloadAll, runSync, refreshPush]);
 
   // ritmo://hoy, ritmo://foco, ritmo://resumen and ritmo://nueva come from widgets and notifications.
   const route = useCallback((url: string | null | undefined) => {
     if (!url || !url.startsWith('ritmo://')) return;
     if (url.startsWith('ritmo://auth')) {
-      // Email confirmation or password reset link opened the app.
-      handleAuthUrl(url).then((ok) => {
-        if (ok) runSync();
+      // A link from an account email opened the app: activation, sign-in, or password reset.
+      handleAuthUrl(url).then((r) => {
+        if (!r) return;
+        if (r.ok) runSync();
+        if (r.ok && !r.recovery) return;
+        setShowSettings(false);
+        setAuthStep(r.ok ? 'newPassword' : 'form');
+        setAuthError(r.ok ? null : r.message);
+        setAuthMode('signin');
       });
       return;
     }
-    const path = url.replace(/^ritmo:\/\//, '').split(/[?#/]/)[0];
+    const [path, param] = url.replace(/^ritmo:\/\//, '').split(/[?#]/)[0].split('/');
     setShowSettings(false);
     if (path === 'foco') setTab('foco');
-    else if (path === 'amigos') setTab('amigos');
+    else if (path === 'amigos') {
+      setTab('amigos');
+      // ritmo://amigos/<id> opens that friend's sheet (e.g. "X aceptó tu solicitud").
+      if (param && /^[0-9a-f-]{36}$/i.test(param)) setOpenFriendId(param);
+    }
     else if (path === 'resumen') setTab('resumen');
     else if (path === 'nueva') {
       setTab('hoy');
@@ -222,6 +263,12 @@ export default function App() {
 
   if (!ready) return null;
 
+  const closeAuth = () => {
+    setAuthMode(null);
+    setAuthStep('form');
+    setAuthError(null);
+  };
+
   const openFocus = (id: string) => {
     const t = api.tasks.find((x) => x.id === id);
     if (!t) return;
@@ -245,7 +292,9 @@ export default function App() {
           <AuthSheet
             visible={authMode !== null}
             initialMode={authMode ?? 'signin'}
-            onClose={() => setAuthMode(null)}
+            initialStep={authStep}
+            initialError={authError}
+            onClose={closeAuth}
             onSignedIn={async () => {
               await runSync();
               requestNotificationPermission();
@@ -288,7 +337,10 @@ export default function App() {
                   mine={mine}
                   onAuth={(m) => setAuthMode(m)}
                   onConfirm={setConfirm}
-                  onProfileReady={() => publishProgress(mine.done, mine.total, mine.focusUntil)}
+                  onProfileReady={() => publishProgress(mine, history)}
+                  history={history}
+                  openFriendId={openFriendId}
+                  onFriendOpened={() => setOpenFriendId(null)}
                 />
               )}
               {tab === 'resumen' && <Summary api={api} habits={habitsApi.habits} name={settings.name} onOpenSettings={() => setShowSettings(true)} />}
@@ -318,13 +370,16 @@ export default function App() {
                       detail: 'Tus datos se quedan en este teléfono y en tu respaldo.',
                       confirmLabel: 'Cerrar sesión',
                       destructive: true,
-                      onConfirm: () => {
-                        signOut();
+                      onConfirm: async () => {
+                        await unregisterPush().catch(() => {});
+                        await signOut();
                         setAccount({ email: null, syncing: false });
                       },
                     })
                   }
                   onSyncNow={runSync}
+                  push={push}
+                  onPushRetry={() => refreshPush(true)}
                 />
               </View>
             )}
@@ -343,7 +398,14 @@ export default function App() {
             />
             <ActionsSheet request={actions} onClose={() => setActions(null)} />
             <ConfirmSheet request={confirm} onClose={() => setConfirm(null)} />
-            <AuthSheet visible={authMode !== null} initialMode={authMode ?? 'signup'} onClose={() => setAuthMode(null)} onSignedIn={runSync} />
+            <AuthSheet
+              visible={authMode !== null}
+              initialMode={authMode ?? 'signup'}
+              initialStep={authStep}
+              initialError={authError}
+              onClose={closeAuth}
+              onSignedIn={runSync}
+            />
             <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           </View>
         </BlurTargetContext.Provider>

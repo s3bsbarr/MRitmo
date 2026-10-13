@@ -24,9 +24,9 @@ Cada `push` a `main` compila el APK con GitHub Actions y lo publica en **Release
 
 Si existen los secretos `RITMO_KEYSTORE_B64` y `RITMO_KEYSTORE_PASSWORD` en *Settings → Secrets and variables → Actions*, el APK se firma con la llave de Ritmo; si no, con la de pruebas.
 
-## Cuentas y amigos (siguiente fase)
+## Cuentas, amigos y servidor
 
-`supabase/schema.sql` crea perfiles, amistades, avance diario compartido y hábitos, con Row Level Security.
+Supabase guarda el respaldo de cada cuenta, los perfiles, las amistades y el avance diario compartido (solo % y minutos), todo con Row Level Security. Las migraciones (`supabase/migrations/`), la Edge Function de notificaciones push (`supabase/functions/push`) y las plantillas de correo (`supabase/templates/`) se despliegan solas con el flujo **Servidor (Supabase)**. Configuración inicial: [`docs/SERVIDOR.md`](docs/SERVIDOR.md).
 
 ## Desarrollo
 

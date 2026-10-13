@@ -12,6 +12,8 @@ import type { Gender, Settings as SettingsT, ThemePref } from '../data';
 import { requestNotificationPermission } from '../effects';
 import { font, radius, space, type, useTheme } from '../theme';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import { PushStatus, pushStatusLabel } from '../push';
 
 export type AccountInfo = {
   email: string | null;
@@ -28,6 +30,8 @@ type Props = {
   onAuth: (mode: 'signup' | 'signin') => void;
   onSignOut: () => void;
   onSyncNow: () => void;
+  push: PushStatus;
+  onPushRetry: () => void;
 };
 
 function ago(ms?: number) {
@@ -193,7 +197,7 @@ function ToggleRow({ label, detail, value, onChange, last }: { label: string; de
   );
 }
 
-export function SettingsScreen({ settings, update, onClose, account, onAuth, onSignOut, onSyncNow }: Props) {
+export function SettingsScreen({ settings, update, onClose, account, onAuth, onSignOut, onSyncNow, push, onPushRetry }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(settings.name);
@@ -213,7 +217,10 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
     }
     const ok = await requestNotificationPermission();
     setNotifState(ok ? 'granted' : 'blocked');
-    if (ok) update({}); // re-applies reminders now that they can be shown
+    if (ok) {
+      update({}); // re-applies reminders now that they can be shown
+      onPushRetry();
+    }
   };
 
   const themes: { key: ThemePref; label: string }[] = [
@@ -412,7 +419,14 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
               onToggle={(v) => update({ remindEvening: v })} onTime={(t) => update({ closeTime: t })} />
             <ToggleRow label="Día libre" detail="A las 10:00 a. m. si no tienes tareas" value={settings.remindFreeDay} onChange={(v) => update({ remindFreeDay: v })} />
             <ToggleRow label="Tarea sin empezar" detail="5 minutos después de su hora" value={settings.remindOverdue} onChange={(v) => update({ remindOverdue: v })} />
-            <ToggleRow label="Descanso" detail="15 min después de cerrar un día al 100 %" value={settings.remindRest} onChange={(v) => update({ remindRest: v })} last />
+            <ToggleRow label="Descanso" detail="15 min después de cerrar un día al 100 %" value={settings.remindRest} onChange={(v) => update({ remindRest: v })} />
+            <ToggleRow
+              label="Amigos"
+              detail={settings.remindFriends ? pushStatusLabel(push) : 'Apagadas: no te avisamos de solicitudes'}
+              value={settings.remindFriends}
+              onChange={(v) => update({ remindFriends: v })}
+              last
+            />
           </View>
           <Text style={[type.callout, { color: c.text, marginTop: space.xl, marginBottom: space.sm }]}>Aviso antes de una tarea programada</Text>
           <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.md, padding: 4 }} accessibilityRole="radiogroup">
@@ -451,7 +465,7 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
           </Section>
         )}
 
-        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.4</Text>
+        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo {Constants.expoConfig?.version ?? ''}</Text>
       </ScrollView>
     </View>
   );

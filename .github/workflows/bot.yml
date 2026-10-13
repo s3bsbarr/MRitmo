@@ -1,0 +1,52 @@
+name: Amigo bot
+
+# A second account (@amigobot) to test everything about friends from one phone.
+# Run it from the GitHub app: Actions → Amigo bot → Run workflow.
+#
+#   preparar   creates the bot (once), 7 days of history, and sends you a request
+#   solicitud  the bot sends you a new request (to test that notification again)
+#   avanzar    +30 min to the bot's day and 25 min in focus
+#   completar  the bot finishes its day (100 %)
+#   quitar     removes the friendship (add @amigobot from the app: it accepts by itself)
+#   estado     the bot's last days and the last notifications sent
+#
+# Its progress also moves by itself every minute from 7:00 to 21:00 (Bogotá).
+
+on:
+  workflow_dispatch:
+    inputs:
+      accion:
+        description: Qué hacer
+        type: choice
+        default: estado
+        options: [preparar, solicitud, avanzar, completar, quitar, estado]
+      usuario:
+        description: Tu @usuario de Ritmo (solo para "preparar")
+        type: string
+        required: false
+
+env:
+  SUPABASE_PROJECT_REF: qehkinjwkpfmmmyxqjxm
+
+jobs:
+  bot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Supabase client (only to create the bot's account)
+        if: inputs.accion == 'preparar'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          ACCION: ${{ inputs.accion }}
+          USUARIO: ${{ inputs.usuario }}
+        run: node supabase/scripts/server.mjs bot "$ACCION" "$USUARIO"

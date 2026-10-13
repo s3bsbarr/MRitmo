@@ -1,19 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Share, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../avatar/Avatar';
 import { moodFor } from '../avatar/mood';
 import type { ConfirmRequest } from '../components/ConfirmSheet';
+import { FriendSheet } from '../components/FriendSheet';
 import { NAV_HEIGHT } from '../components/NavBar';
 import { Press } from '../components/Press';
+import { UsernameField } from '../components/UsernameField';
 import type { Gender } from '../data';
 import { formatShort } from '../format';
 import {
   accept,
+  BoardRow,
   boardOf,
   claimUsername,
+  DayProgress,
   FriendsState,
+  loadDays,
   loadFriends,
   normalizeUsername,
   Profile,
@@ -33,6 +38,11 @@ type Props = {
   onAuth: (mode: 'signup' | 'signin') => void;
   onConfirm: (r: ConfirmRequest) => void;
   onProfileReady: () => void;
+  /** Your own recent days, computed on this phone (for your own sheet). */
+  history: DayProgress[];
+  /** Open this friend's sheet as soon as they are on the board (from a notification). */
+  openFriendId?: string | null;
+  onFriendOpened?: () => void;
 };
 
 const empty: FriendsState = { me: null, friends: [], incoming: [], outgoing: [], progress: {} };
@@ -47,24 +57,9 @@ function Header({ title, right }: { title: string; right?: React.ReactNode }) {
   );
 }
 
-function useField() {
-  const { c } = useTheme();
-  return {
-    fontFamily: font.regular,
-    fontSize: 17,
-    letterSpacing: -0.2,
-    color: c.text,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: space.lg,
-    paddingVertical: 14,
-  } as const;
-}
-
-export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onProfileReady }: Props) {
+export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onProfileReady, history, openFriendId, onFriendOpened }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  const field = useField();
   const [st, setSt] = useState<FriendsState>(empty);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,6 +69,12 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetDays, setSheetDays] = useState<DayProgress[] | null>(null);
+  const [sheetError, setSheetError] = useState<string | null>(null);
+  const lastSheetRow = useRef<BoardRow | null>(null);
+  const sheetReq = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -102,6 +103,35 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
       clearInterval(id);
     };
   }, [signedIn, load]);
+
+  const openSheet = useCallback(
+    (r: BoardRow) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      lastSheetRow.current = r;
+      setSheetId(r.profile.id);
+      setSheetOpen(true);
+      setSheetError(null);
+      const req = ++sheetReq.current;
+      if (r.me) {
+        setSheetDays(history);
+        return;
+      }
+      setSheetDays(null);
+      loadDays(r.profile.id)
+        .then((d) => req === sheetReq.current && setSheetDays(d))
+        .catch((e) => req === sheetReq.current && setSheetError((e as Error).message));
+    },
+    [history],
+  );
+
+  // A notification ("X aceptó tu solicitud") asked to open someone's sheet.
+  useEffect(() => {
+    if (!openFriendId || loading || !st.me) return;
+    const row = boardOf(st, mine).find((r) => r.profile.id === openFriendId);
+    if (row) openSheet(row);
+    onFriendOpened?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openFriendId, loading, st]);
 
   const pad = {
     paddingTop: insets.top + space.xl,
@@ -177,21 +207,7 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
         <Text style={[type.title, { color: c.text, marginTop: space.xxxl }]}>Elige tu usuario</Text>
         <Text style={[type.body, { color: c.textSecondary, marginTop: space.sm }]}>Es como te encuentran tus amigos. Letras minúsculas, números, punto o guion bajo.</Text>
         <View style={{ marginTop: space.xl }}>
-          <TextInput
-            value={username}
-            onChangeText={(t) => setUsername(t.replace(/\s/g, '').toLowerCase())}
-            placeholder="@usuario"
-            placeholderTextColor={c.textTertiary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-            maxLength={21}
-            returnKeyType="done"
-            onSubmitEditing={claim}
-            selectionColor={c.ink}
-            cursorColor={c.ink}
-            style={field}
-          />
+          <UsernameField value={username} onChange={setUsername} onSubmit={claim} autoFocus accessibilityLabel="Tu usuario" />
         </View>
         {error ? <Text style={[type.footnote, { color: c.danger, marginTop: space.md }]}>{error}</Text> : null}
         <Press
@@ -230,7 +246,8 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
     }
   };
 
-  const askRemove = (p: Profile) =>
+  const askRemove = (p: Profile) => {
+    setSheetOpen(false);
     onConfirm({
       title: '¿Eliminar amigo?',
       subject: p.display_name || `@${p.username}`,
@@ -242,6 +259,11 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
         load();
       },
     });
+  };
+
+  const liveSheetRow = board.find((r) => r.profile.id === sheetId) ?? null;
+  if (liveSheetRow) lastSheetRow.current = liveSheetRow;
+  const sheetRow = liveSheetRow ?? lastSheetRow.current;
 
   return (
     <ScrollView
@@ -288,9 +310,12 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
           return (
               <Press
                 key={r.profile.id}
+                onPress={() => openSheet(r)}
                 onLongPress={r.me ? undefined : () => askRemove(r.profile)}
                 delayLongPress={400}
-                scaleTo={r.me ? 1 : 0.99}
+                scaleTo={0.99}
+                accessibilityRole="button"
+                accessibilityHint="Abre su avance de la semana"
                 accessibilityLabel={`${r.me ? 'Tú' : r.profile.display_name || r.profile.username}, puesto ${i + 1}, ${pct} por ciento${inFocus ? ', en foco' : ''}`}
                 style={{
                   flexDirection: 'row',
@@ -381,20 +406,7 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
       <Header title="Agregar amigo" />
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-        <TextInput
-          value={addName}
-          onChangeText={(t) => setAddName(t.replace(/\s/g, '').toLowerCase())}
-          placeholder="@usuario"
-          placeholderTextColor={c.textTertiary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          maxLength={21}
-          returnKeyType="send"
-          onSubmitEditing={add}
-          selectionColor={c.ink}
-          cursorColor={c.ink}
-          style={[field, { width: '100%' }]}
-        />
+          <UsernameField value={addName} onChange={setAddName} onSubmit={add} returnKeyType="send" accessibilityLabel="Usuario de tu amigo" />
         </View>
         <Press
           onPress={add}
@@ -441,8 +453,18 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
       )}
 
       <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.xxl, textAlign: 'center' }]}>
-        Solo compartes el % del día y si estás en foco. Mantén presionado a un amigo para eliminarlo.
+        Solo compartes el % del día y si estás en foco. Toca a alguien para ver su semana.
       </Text>
+
+      <FriendSheet
+        visible={sheetOpen}
+        row={sheetRow}
+        days={sheetDays}
+        error={sheetError}
+        now={now}
+        onClose={() => setSheetOpen(false)}
+        onRemove={sheetRow && !sheetRow.me ? () => askRemove(sheetRow.profile) : undefined}
+      />
     </ScrollView>
   );
 }

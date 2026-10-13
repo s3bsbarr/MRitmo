@@ -1,31 +1,46 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from '../haptics';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, View } from 'react-native';
-import { friendlyError, resetPassword, signIn, signInWithLink, signUp } from '../sync';
+import * as Haptics from '../haptics';
+import { EmailCodeKind, friendlyError, resendSignup, resetPassword, signIn, signInWithLink, signUp, updatePassword, verifyEmailCode } from '../sync';
 import { font, radius, space, type, useTheme } from '../theme';
 import { Press } from './Press';
 import { Sheet } from './Sheet';
 
 type Mode = 'signin' | 'signup';
+export type AuthStep = 'form' | 'code' | 'newPassword';
 
-/** Create an account or sign in. On success the caller restores and backs up data. */
+const EMAIL_RE = /\S+@\S+\.\S+/;
+
+/**
+ * Create an account or sign in. Every email (activation, sign-in link, password
+ * reset) carries a link and a 6-digit code: the code works even when the link
+ * opens in a browser instead of Ritmo. On success the caller restores and backs up data.
+ */
 export function AuthSheet({
   visible,
   initialMode = 'signup',
+  initialStep = 'form',
+  initialError = null,
   onClose,
   onSignedIn,
 }: {
   visible: boolean;
   initialMode?: Mode;
+  /** 'newPassword' when a password-reset link opened the app. */
+  initialStep?: AuthStep;
+  initialError?: string | null;
   onClose: () => void;
   onSignedIn: () => void;
 }) {
   const { c } = useTheme();
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [step, setStep] = useState<AuthStep>(initialStep);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [code, setCode] = useState('');
+  const [pending, setPending] = useState<EmailCodeKind>('link');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -33,13 +48,35 @@ export function AuthSheet({
   useEffect(() => {
     if (!visible) return;
     setMode(initialMode);
+    setStep(initialStep);
     setPassword('');
-    setError(null);
+    setCode('');
+    setError(initialError);
     setNotice(null);
     setBusy(false);
-  }, [visible, initialMode]);
+  }, [visible, initialMode, initialStep, initialError]);
 
-  const valid = /\S+@\S+\.\S+/.test(email.trim()) && password.length >= 6;
+  const emailOk = EMAIL_RE.test(email.trim());
+  const valid = emailOk && password.length >= 6;
+
+  const fail = (e: unknown) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    setError(friendlyError(e));
+  };
+
+  const done = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    onSignedIn();
+    onClose();
+  };
+
+  const toCode = (kind: EmailCodeKind, message: string) => {
+    setPending(kind);
+    setCode('');
+    setError(null);
+    setNotice(message);
+    setStep('code');
+  };
 
   const submit = async () => {
     if (!valid || busy) return;
@@ -50,52 +87,101 @@ export function AuthSheet({
       if (mode === 'signup') {
         const r = await signUp(email, password);
         if (r === 'confirm') {
-          setNotice(`Te enviamos un enlace a ${email.trim()}. Ábrelo desde este teléfono para activar tu cuenta.`);
-          setMode('signin');
+          toCode('signup', `Te enviamos un enlace y un código a ${email.trim()} para activar tu cuenta.`);
           return;
         }
       } else {
         await signIn(email, password);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      onSignedIn();
-      onClose();
+      done();
     } catch (e) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
-      setError(friendlyError(e));
+      fail(e);
     } finally {
       setBusy(false);
     }
   };
 
   const sendLink = async () => {
-    if (!/\S+@\S+\.\S+/.test(email.trim())) {
+    if (!emailOk) {
       setError('Escribe tu correo arriba y vuelve a tocar "Entrar sin contraseña".');
       return;
     }
     setBusy(true);
     try {
       await signInWithLink(email);
-      setError(null);
-      setNotice(`Te enviamos un enlace a ${email.trim()}. Ábrelo desde este teléfono y entras directo.`);
+      toCode('link', `Te enviamos un enlace y un código a ${email.trim()}. Toca el enlace desde este teléfono o escribe el código.`);
     } catch (e) {
-      setError(friendlyError(e));
+      fail(e);
     } finally {
       setBusy(false);
     }
   };
 
   const forgot = async () => {
-    if (!/\S+@\S+\.\S+/.test(email.trim())) {
+    if (!emailOk) {
       setError('Escribe tu correo arriba y vuelve a tocar "Olvidé mi contraseña".');
       return;
     }
+    setBusy(true);
     try {
       await resetPassword(email);
-      setError(null);
-      setNotice(`Te enviamos un enlace a ${email.trim()} para cambiar tu contraseña.`);
+      toCode('recovery', `Te enviamos un enlace y un código a ${email.trim()} para elegir una contraseña nueva.`);
     } catch (e) {
-      setError(friendlyError(e));
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (pending === 'recovery') await resetPassword(email);
+      else if (pending === 'link') await signInWithLink(email);
+      else await resendSignup(email);
+      setNotice(`Listo, revisa otra vez ${email.trim()}. Usa el código del correo más reciente.`);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verify = async () => {
+    const token = code.replace(/\D/g, '');
+    if (token.length < 6 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await verifyEmailCode(email, token, pending);
+      if (pending === 'recovery') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        setPassword('');
+        setNotice(null);
+        setStep('newPassword');
+      } else {
+        done();
+      }
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePassword = async () => {
+    if (password.length < 6 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await updatePassword(password);
+      done();
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -109,6 +195,118 @@ export function AuthSheet({
     paddingHorizontal: space.lg,
     paddingVertical: 14,
   } as const;
+
+  const passwordField = (placeholder: string, onGo: () => void, isNew: boolean) => (
+    <View>
+      <TextInput
+        value={password}
+        onChangeText={setPassword}
+        placeholder={placeholder}
+        placeholderTextColor={c.textTertiary}
+        secureTextEntry={!showPw}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete={isNew ? 'new-password' : 'current-password'}
+        textContentType={isNew ? 'newPassword' : 'password'}
+        returnKeyType="go"
+        onSubmitEditing={onGo}
+        selectionColor={c.ink}
+        cursorColor={c.ink}
+        style={[input, { paddingRight: 52 }]}
+      />
+      <Press
+        onPress={() => setShowPw(!showPw)}
+        accessibilityRole="button"
+        accessibilityLabel={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+        style={{ position: 'absolute', right: 4, top: 0, bottom: 0, width: 44, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.textSecondary} />
+      </Press>
+    </View>
+  );
+
+  const primary = (label: string, onPress: () => void, enabled: boolean) => (
+    <Press
+      onPress={onPress}
+      disabled={!enabled || busy}
+      accessibilityRole="button"
+      style={{ marginTop: space.xl, height: 54, borderRadius: radius.pill, backgroundColor: c.ink, opacity: enabled ? 1 : 0.3, alignItems: 'center', justifyContent: 'center' }}
+    >
+      {busy ? <ActivityIndicator color={c.inkOnInk} /> : <Text style={[type.headline, { color: c.inkOnInk }]}>{label}</Text>}
+    </Press>
+  );
+
+  const messages = (
+    <>
+      {error && (
+        <Text style={[type.footnote, { color: c.danger, marginTop: space.md }]} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      )}
+      {notice && (
+        <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md, backgroundColor: c.surface, borderRadius: radius.md, padding: space.md }}>
+          <Ionicons name="mail-outline" size={18} color={c.text} />
+          <Text style={[type.footnote, { color: c.text, flex: 1 }]} accessibilityLiveRegion="polite">
+            {notice}
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  const textLink = (label: string, onPress: () => void) => (
+    <Press onPress={onPress} disabled={busy} style={{ alignSelf: 'center', padding: space.sm, marginTop: space.xs }}>
+      <Text style={[type.callout, { color: c.textSecondary }]}>{label}</Text>
+    </Press>
+  );
+
+  if (step === 'code') {
+    const digits = code.replace(/\D/g, '');
+    return (
+      <Sheet visible={visible} onClose={onClose}>
+        <Text style={[type.title, { color: c.text }]}>Revisa tu correo</Text>
+        {messages}
+        <TextInput
+          value={code}
+          onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 8))}
+          placeholder="Código de 6 dígitos"
+          placeholderTextColor={c.textTertiary}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          textContentType="oneTimeCode"
+          maxLength={8}
+          returnKeyType="go"
+          onSubmitEditing={verify}
+          accessibilityLabel="Código del correo"
+          selectionColor={c.ink}
+          cursorColor={c.ink}
+          style={[input, { marginTop: space.lg, textAlign: 'center', fontFamily: font.semibold, fontSize: digits ? 26 : 17, letterSpacing: digits ? 6 : -0.2 }]}
+        />
+        {primary(pending === 'recovery' ? 'Continuar' : 'Entrar', verify, digits.length >= 6)}
+        {textLink('Reenviar correo', resend)}
+        {textLink('Usar otro correo', () => {
+          setStep('form');
+          setNotice(null);
+          setError(null);
+        })}
+      </Sheet>
+    );
+  }
+
+  if (step === 'newPassword') {
+    return (
+      <Sheet visible={visible} onClose={onClose}>
+        <Text style={[type.title, { color: c.text }]}>Nueva contraseña</Text>
+        <Text style={[type.callout, { color: c.textSecondary, marginTop: space.xs }]}>
+          Elige la contraseña con la que vas a entrar desde ahora. Tus datos siguen intactos.
+        </Text>
+        <View style={{ marginTop: space.xl }}>{passwordField('Contraseña nueva (mínimo 6)', savePassword, true)}</View>
+        {messages}
+        {primary('Guardar contraseña', savePassword, password.length >= 6)}
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet visible={visible} onClose={onClose}>
@@ -156,68 +354,12 @@ export function AuthSheet({
           cursorColor={c.ink}
           style={input}
         />
-        <View>
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            placeholder={mode === 'signup' ? 'Contraseña (mínimo 6)' : 'Contraseña'}
-            placeholderTextColor={c.textTertiary}
-            secureTextEntry={!showPw}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            textContentType={mode === 'signup' ? 'newPassword' : 'password'}
-            returnKeyType="go"
-            onSubmitEditing={submit}
-            selectionColor={c.ink}
-            cursorColor={c.ink}
-            style={[input, { paddingRight: 52 }]}
-          />
-          <Press
-            onPress={() => setShowPw(!showPw)}
-            accessibilityRole="button"
-            accessibilityLabel={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-            style={{ position: 'absolute', right: 4, top: 0, bottom: 0, width: 44, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={20} color={c.textSecondary} />
-          </Press>
-        </View>
+        {passwordField(mode === 'signup' ? 'Contraseña (mínimo 6)' : 'Contraseña', submit, mode === 'signup')}
       </View>
 
-      {error && (
-        <Text style={[type.footnote, { color: c.danger, marginTop: space.md }]} accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      )}
-      {notice && (
-        <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md, backgroundColor: c.surface, borderRadius: radius.md, padding: space.md }}>
-          <Ionicons name="mail-outline" size={18} color={c.text} />
-          <Text style={[type.footnote, { color: c.text, flex: 1 }]} accessibilityLiveRegion="polite">
-            {notice}
-          </Text>
-        </View>
-      )}
+      {messages}
 
-      <Press
-        onPress={submit}
-        disabled={!valid || busy}
-        accessibilityRole="button"
-        style={{
-          marginTop: space.xl,
-          height: 54,
-          borderRadius: radius.pill,
-          backgroundColor: c.ink,
-          opacity: valid ? 1 : 0.3,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {busy ? (
-          <ActivityIndicator color={c.inkOnInk} />
-        ) : (
-          <Text style={[type.headline, { color: c.inkOnInk }]}>{mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
-        )}
-      </Press>
+      {primary(mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión', submit, valid)}
 
       {mode === 'signin' && (
         <>
@@ -230,9 +372,7 @@ export function AuthSheet({
             <Ionicons name="link-outline" size={18} color={c.text} />
             <Text style={[type.headline, { color: c.text }]}>Entrar sin contraseña</Text>
           </Press>
-          <Press onPress={forgot} style={{ alignSelf: 'center', padding: space.sm, marginTop: space.xs }}>
-            <Text style={[type.callout, { color: c.textSecondary }]}>Olvidé mi contraseña</Text>
-          </Press>
+          {textLink('Olvidé mi contraseña', forgot)}
         </>
       )}
     </Sheet>

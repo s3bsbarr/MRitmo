@@ -7,6 +7,9 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+      - 'supabase/**'
+      - '.github/workflows/server.yml'
+      - '.github/workflows/bot.yml'
   workflow_dispatch:
 
 permissions:
@@ -20,6 +23,9 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    env:
+      # Expo project id for push tokens (Settings → Secrets and variables → Actions → Variables).
+      RITMO_EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v5
 
@@ -43,6 +49,20 @@ jobs:
 
       - name: Install dependencies
         run: npm ci 2>&1 | tee -a build.log; exit ${PIPESTATUS[0]}
+
+      - name: Firebase config for push (when the secret is set)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+            node -e "const j=JSON.parse(require('fs').readFileSync('google-services.json','utf8')); const pk=(j.client||[]).map(c=>c.client_info?.android_client_info?.package_name); if(!pk.includes('com.sebas.ritmo')) { console.error('google-services.json no incluye com.sebas.ritmo: '+pk.join(', ')); process.exit(1) } console.log('Firebase listo para com.sebas.ritmo')"
+          else
+            echo "::warning::Sin el secreto GOOGLE_SERVICES_JSON: este APK no recibirá notificaciones push del servidor."
+          fi
+          if [ -z "$RITMO_EXPO_PROJECT_ID" ]; then
+            echo "::warning::Sin la variable EXPO_PROJECT_ID: este APK no podrá registrarse para notificaciones push."
+          fi
 
       - name: Generate native Android project
         run: npx expo prebuild --platform android --no-install 2>&1 | tee -a build.log; exit ${PIPESTATUS[0]}

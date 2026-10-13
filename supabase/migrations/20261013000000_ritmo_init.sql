@@ -26,7 +26,6 @@ drop policy if exists "own state delete" on public.user_state;
 create policy "own state delete" on public.user_state
   for delete to authenticated using (user_id = auth.uid());
 
--- ─── Amigos (preparado para la siguiente fase) ──────────────────────────────
 -- ─── Perfiles ──────────────────────────────────────────────────────────────
 create table if not exists public.profiles (
   id          uuid primary key references auth.users (id) on delete cascade,
@@ -118,31 +117,4 @@ begin
   end if;
 end $$;
 
--- ─── Hábitos (preparado para la siguiente fase) ─────────────────────────────
-create table if not exists public.habits (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references public.profiles (id) on delete cascade,
-  title       text not null,
-  days        smallint[] not null default '{1,2,3,4,5,6,7}',  -- 1 = lunes
-  archived    boolean not null default false,
-  created_at  timestamptz not null default now()
-);
-
-create table if not exists public.habit_checks (
-  habit_id    uuid not null references public.habits (id) on delete cascade,
-  day         date not null,
-  primary key (habit_id, day)
-);
-
-alter table public.habits enable row level security;
-alter table public.habit_checks enable row level security;
-
-drop policy if exists "own habits" on public.habits;
-create policy "own habits" on public.habits
-  for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
-
-drop policy if exists "own habit checks" on public.habit_checks;
-create policy "own habit checks" on public.habit_checks
-  for all to authenticated
-  using (exists (select 1 from public.habits h where h.id = habit_id and h.user_id = auth.uid()))
-  with check (exists (select 1 from public.habits h where h.id = habit_id and h.user_id = auth.uid()));
+-- Las tablas habits/habit_checks de esta versión se eliminaron en 1.6: los hábitos viajan en user_state.

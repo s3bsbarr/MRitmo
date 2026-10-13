@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase (written by the build from a secret) and any service-account key
+google-services.json
+*service-account*.json
+*firebase-adminsdk*.json

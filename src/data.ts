@@ -59,6 +59,8 @@ export type Settings = {
   /** Minutes before a scheduled task to notify; 0 turns it off. */
   taskLead: number;
   remindOverdue: boolean;
+  /** Server push about friends: requests and acceptances. */
+  remindFriends: boolean;
 };
 
 export const emptyFocus: FocusState = { taskId: null, endsAt: null, remaining: 0 };
@@ -78,6 +80,7 @@ export const defaultSettings: Settings = {
   remindRest: true,
   taskLead: 10,
   remindOverdue: true,
+  remindFriends: true,
 };
 
 const TASKS_KEY = 'ritmo.tasks.v1';

@@ -4,7 +4,7 @@
  * titles never leave your account. Row Level Security enforces it server-side.
  */
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { dayKey, Gender } from './data';
+import { dayKey, Gender, progressOf, shiftDay, Task } from './data';
 import { getSession, supabase } from './sync';
 
 export type Profile = { id: string; username: string; display_name: string; gender: Gender };
@@ -162,25 +162,105 @@ export function boardOf(st: FriendsState, mine: { done: number; total: number; f
   return rows.sort((a, b) => b.ratio - a.ratio || b.done - a.done || Number(b.me) - Number(a.me));
 }
 
-let lastPublished = '';
+export type DayProgress = { day: string; done: number; total: number };
 
-/** Share today's progress. Cheap to call often: it skips writes that change nothing. */
-export async function publishProgress(done: number, total: number, focusUntil: number | null) {
+/** How far back friends can see your days (enough for streaks and the week). */
+export const HISTORY_DAYS = 60;
+
+/** Your last days as friends see them: minutes only, from your own tasks. */
+export function historyOf(tasks: Task[], days = HISTORY_DAYS, today = dayKey()): DayProgress[] {
+  const from = shiftDay(today, -(days - 1));
+  const byDay = new Map<string, Task[]>();
+  for (const t of tasks) {
+    if (t.day < from || t.day > today) continue;
+    const list = byDay.get(t.day);
+    if (list) list.push(t);
+    else byDay.set(t.day, [t]);
+  }
+  return [...byDay.entries()].map(([day, list]) => {
+    const p = progressOf(list);
+    return { day, done: Math.round(p.done), total: Math.round(p.total) };
+  });
+}
+
+/** Days in a row at 100 %. Today counts once it is complete; until then it does not break the streak. */
+export function streakOfDays(days: DayProgress[], today = dayKey()) {
+  const full = new Set(days.filter((d) => d.total > 0 && d.done >= d.total).map((d) => d.day));
+  let day = full.has(today) ? today : shiftDay(today, -1);
+  let n = 0;
+  while (full.has(day)) {
+    n++;
+    day = shiftDay(day, -1);
+  }
+  return n;
+}
+
+/** The last seven days, oldest first; null where nothing was planned. */
+export function weekOfDays(days: DayProgress[], today = dayKey()) {
+  const map = new Map(days.map((d) => [d.day, d]));
+  return Array.from({ length: 7 }, (_, i) => {
+    const key = shiftDay(today, i - 6);
+    const d = map.get(key);
+    return { day: key, ratio: d && d.total > 0 ? Math.min(1, d.done / d.total) : null };
+  });
+}
+
+/** A friend's recent days (Row Level Security only returns them to friends). */
+export async function loadDays(userId: string, days = HISTORY_DAYS): Promise<DayProgress[]> {
+  const { data, error } = await supabase
+    .from('day_progress')
+    .select('day, done_minutes, total_minutes')
+    .eq('user_id', userId)
+    .gte('day', shiftDay(dayKey(), -(days - 1)))
+    .order('day', { ascending: true });
+  if (error) fail(error, 'No se pudo cargar su historial.');
+  return (data ?? []).map((r) => ({ day: r.day, done: r.done_minutes, total: r.total_minutes }));
+}
+
+/** What the server has from you, so unchanged days are never sent again. */
+const published = new Map<string, string>();
+let publishedFor = '';
+
+/**
+ * Share today's progress and your recent days. Cheap to call often: only days
+ * that changed are written, in one request. Titles never leave the phone.
+ */
+export async function publishProgress(today: { done: number; total: number; focusUntil: number | null }, history: DayProgress[] = []) {
   const id = await myId();
   if (!id) return;
-  const day = dayKey();
-  const key = `${id}|${day}|${done}|${total}|${focusUntil ?? ''}`;
-  if (key === lastPublished) return;
-  const { error } = await supabase.from('day_progress').upsert({
-    user_id: id,
-    day,
-    done_minutes: Math.round(done),
-    total_minutes: Math.round(total),
-    focus_until: focusUntil ? new Date(focusUntil).toISOString() : null,
-    updated_at: new Date().toISOString(),
+  if (publishedFor !== id) {
+    published.clear();
+    publishedFor = id;
+  }
+  const todayKey = dayKey();
+  const rows = new Map<string, { done: number; total: number; focus: string | null }>();
+  for (const d of history) if (d.day !== todayKey) rows.set(d.day, { done: d.done, total: d.total, focus: null });
+  // A day that had a plan and now has none goes back to 0 so it stops counting.
+  for (const day of published.keys()) if (!rows.has(day) && day !== todayKey && day >= shiftDay(todayKey, -(HISTORY_DAYS - 1))) rows.set(day, { done: 0, total: 0, focus: null });
+  rows.set(todayKey, {
+    done: Math.round(today.done),
+    total: Math.round(today.total),
+    focus: today.focusUntil ? new Date(today.focusUntil).toISOString() : null,
   });
-  // Fails until a username exists (the row belongs to a profile); try again next time.
-  if (!error) lastPublished = key;
+
+  const now = new Date().toISOString();
+  const changed = [...rows.entries()]
+    .map(([day, r]) => ({ day, r, key: `${r.done}|${r.total}|${r.focus ?? ''}` }))
+    .filter(({ day, r, key }) => published.get(day) !== key && !(r.total === 0 && r.done === 0 && !published.has(day) && day !== todayKey));
+  if (changed.length === 0) return;
+
+  const { error } = await supabase.from('day_progress').upsert(
+    changed.map(({ day, r }) => ({
+      user_id: id,
+      day,
+      done_minutes: Math.max(0, r.done),
+      total_minutes: Math.max(0, r.total),
+      focus_until: r.focus,
+      updated_at: now,
+    })),
+  );
+  // Fails until a username exists (rows belong to a profile); the next call retries.
+  if (!error) for (const { day, key } of changed) published.set(day, key);
 }
 
 /** Live board: any friend's progress change or a new request triggers a reload. */

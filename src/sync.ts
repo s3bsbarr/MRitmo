@@ -40,6 +40,8 @@ const MESSAGES: [RegExp, string][] = [
   [/invalid email|unable to validate email/i, 'Ese correo no parece válido.'],
   [/rate limit|too many/i, 'Demasiados intentos. Espera un momento y vuelve a intentarlo.'],
   [/network|fetch/i, 'Sin conexión. Revisa tu internet e inténtalo de nuevo.'],
+  [/expired|invalid.*(token|otp|code)|(token|otp|code).*invalid/i, 'Ese código o enlace ya no sirve. Pide uno nuevo.'],
+  [/should be different|same password/i, 'Usa una contraseña distinta a la anterior.'],
   [/signups not allowed|user not found|otp/i, 'No hay una cuenta con ese correo. Crea una primero.'],
 ];
 
@@ -85,6 +87,11 @@ export async function signInWithLink(email: string) {
   if (error) throw error;
 }
 
+export async function resendSignup(email: string) {
+  const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim(), options: { emailRedirectTo: AUTH_REDIRECT } });
+  if (error) throw error;
+}
+
 export async function signOut() {
   await supabase.auth.signOut().catch(() => {});
 }
@@ -94,15 +101,40 @@ export async function resetPassword(email: string) {
   if (error) throw error;
 }
 
-/** Finish an email-confirmation link: ritmo://auth#access_token=…&refresh_token=… */
-export async function handleAuthUrl(url: string) {
-  if (!url.startsWith(AUTH_REDIRECT)) return false;
-  const params = new URLSearchParams(url.split('#')[1] ?? url.split('?')[1] ?? '');
+export type EmailCodeKind = 'signup' | 'link' | 'recovery';
+
+/**
+ * The 6-digit code from any account email. Same result as tapping the link,
+ * for when the link opens in a browser instead of in Ritmo.
+ */
+export async function verifyEmailCode(email: string, code: string, kind: EmailCodeKind) {
+  const type = kind === 'recovery' ? 'recovery' : kind === 'signup' ? 'signup' : 'email';
+  const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code.trim(), type });
+  if (error) throw error;
+}
+
+export async function updatePassword(password: string) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw error;
+}
+
+export type AuthUrlResult = { ok: true; recovery: boolean } | { ok: false; message: string } | null;
+
+/**
+ * Finish a link from an account email: ritmo://auth#access_token=…&refresh_token=…&type=…
+ * `recovery` means "Olvidé mi contraseña": the app then asks for the new one.
+ */
+export async function handleAuthUrl(url: string): Promise<AuthUrlResult> {
+  if (!url.startsWith(AUTH_REDIRECT)) return null;
+  const params = new URLSearchParams([url.split('#')[1], url.split('?')[1]?.split('#')[0]].filter(Boolean).join('&'));
+  const err = params.get('error_description') || params.get('error');
+  if (err) return { ok: false, message: friendlyError(new Error(err.replace(/\+/g, ' '))) };
   const access_token = params.get('access_token');
   const refresh_token = params.get('refresh_token');
-  if (!access_token || !refresh_token) return false;
+  if (!access_token || !refresh_token) return null;
   const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-  return !error;
+  if (error) return { ok: false, message: friendlyError(error) };
+  return { ok: true, recovery: params.get('type') === 'recovery' };
 }
 
 let inFlight: Promise<SyncResult> | null = null;

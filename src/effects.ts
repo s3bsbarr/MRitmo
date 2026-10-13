@@ -32,6 +32,8 @@ export const CH = {
   tasks: 'ritmo_tasks_v2',
   reminders: 'ritmo_reminders_v2',
   motivation: 'ritmo_motivation_v2',
+  /** Server push about friends (requests, acceptances; shared habits in 1.7). */
+  friends: 'ritmo_friends',
 };
 
 /** Channels from earlier versions. A channel's sound cannot change, so they are replaced. */
@@ -91,6 +93,12 @@ function setup() {
         name: 'Motivación',
         description: 'Un mensaje por la mañana y al cerrar un día completo.',
         importance: Notifications.AndroidImportance.DEFAULT,
+        sound: SOFT,
+      }).catch(() => {});
+      await Notifications.setNotificationChannelAsync(CH.friends, {
+        name: 'Amigos',
+        description: 'Solicitudes de amistad y cuando alguien te acepta.',
+        importance: Notifications.AndroidImportance.HIGH,
         sound: SOFT,
       }).catch(() => {});
     }
