@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -76,6 +77,28 @@ class RitmoLiveModule : Module() {
     )
   }
 
+  /**
+   * Buttons on the live notification. They reuse the timer widget's click path,
+   * which runs our JS in the background, so they work with the app closed.
+   */
+  private fun actionIntent(action: String, requestCode: Int): PendingIntent {
+    val pkg = context.packageName
+    val intent = Intent("$pkg.WIDGET_CLICK_LIVE_$action").apply {
+      setClassName(pkg, "$pkg.widget.RitmoFoco")
+      putExtra("widgetId", -1)
+      putExtra("clickAction", action)
+      putExtra("clickActionData", Bundle())
+    }
+    return PendingIntent.getBroadcast(
+      context, requestCode, intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+  }
+
+  @Suppress("DEPRECATION")
+  private fun action(label: String, action: String, requestCode: Int): Notification.Action =
+    Notification.Action.Builder(0, label, actionIntent(action, requestCode)).build()
+
   private fun smallIcon(): Int {
     val id = context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
     return if (id != 0) id else android.R.drawable.ic_lock_idle_alarm
@@ -98,7 +121,13 @@ class RitmoLiveModule : Module() {
       .setCategory(Notification.CATEGORY_PROGRESS)
       .setVisibility(Notification.VISIBILITY_PUBLIC)
 
+    val status: String
     if (endsAt != null) {
+      status = "Foco en curso"
+      builder
+        .addAction(action("+5 min", "PLUS5", 41))
+        .addAction(action("Pausar", "PAUSE", 42))
+        .addAction(action("Terminé", "DONE", 43))
       builder
         .setContentText("Foco en curso")
         .setWhen(endsAt)
@@ -109,7 +138,24 @@ class RitmoLiveModule : Module() {
       if (left > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setTimeoutAfter(left)
     } else {
       val minutes = ((remainingMs ?: 0L) + 59_999L) / 60_000L
-      builder.setContentText("En pausa · quedan $minutes min").setShowWhen(false)
+      status = "En pausa · quedan $minutes min"
+      builder
+        .setContentText(status)
+        .setShowWhen(false)
+        .addAction(action("Seguir", "START", 44))
+        .addAction(action("Terminé", "DONE", 43))
+    }
+
+    // Samsung Live Notifications / Now Bar fields (used when One UI allows this app).
+    builder.extras.apply {
+      putInt("android.ongoingActivityNoti.style", 1)
+      putString("android.ongoingActivityNoti.primaryInfo", title)
+      putString("android.ongoingActivityNoti.secondaryInfo", status)
+      putString("android.ongoingActivityNoti.nowbarPrimaryInfo", title)
+      putString("android.ongoingActivityNoti.nowbarSecondaryInfo", status)
+      putString("android.ongoingActivityNoti.chipExpandedText", title)
+      putInt("android.ongoingActivityNoti.actionType", 1)
+      putInt("android.ongoingActivityNoti.actionPrimarySet", 0)
     }
 
     // Ask Android 16+ to promote this to a Live Update (Now Bar / status chip).

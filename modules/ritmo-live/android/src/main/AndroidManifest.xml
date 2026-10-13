@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <!-- Lets Android 16+ promote the focus timer to a Live Update (Now Bar). Normal permission, granted at install. -->
   <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+  <application>
+    <!-- Marks the focus notification as an ongoing activity for Samsung's Live Notifications. -->
+    <meta-data android:name="com.samsung.android.support.ongoing_activity" android:value="true" />
+  </application>
 </manifest>

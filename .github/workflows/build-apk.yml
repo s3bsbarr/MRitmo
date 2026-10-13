@@ -45,6 +45,12 @@ jobs:
         env:
           EXPO_NO_TELEMETRY: 1
 
+      - name: Read the app version
+        run: |
+          V=$(node -p "require('./app.json').expo.version")
+          echo "APP_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Ritmo $V"
+
       - name: Build only for 64-bit ARM phones (faster build, smaller APK)
         run: |
           sed -i 's/^reactNativeArchitectures=.*/reactNativeArchitectures=arm64-v8a/' android/gradle.properties
@@ -52,7 +58,7 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > android/local.properties
           # Every build gets a higher version so it installs over the previous one.
           sed -i -E "s/versionCode [0-9]+/versionCode $((100 + ${{ github.run_number }}))/" android/app/build.gradle
-          sed -i -E "s/versionName \"[^\"]+\"/versionName \"1.1.${{ github.run_number }}\"/" android/app/build.gradle
+          sed -i -E "s/versionName \"[^\"]+\"/versionName \"$APP_VERSION\"/" android/app/build.gradle
           grep -E "versionCode|versionName" android/app/build.gradle
 
       - name: Build release APK
@@ -71,7 +77,7 @@ jobs:
           RITMO_KEYSTORE_PASSWORD: ${{ secrets.RITMO_KEYSTORE_PASSWORD }}
         run: |
           mkdir -p dist
-          OUT="dist/Ritmo-${{ github.run_number }}.apk"
+          OUT="dist/Ritmo-$APP_VERSION.apk"
           APK=android/app/build/outputs/apk/release/app-release.apk
           if [ -n "$RITMO_KEYSTORE_B64" ] && [ -n "$RITMO_KEYSTORE_PASSWORD" ]; then
             echo "$RITMO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ritmo.jks"
@@ -89,14 +95,22 @@ jobs:
 
       - uses: actions/upload-artifact@v5
         with:
-          name: Ritmo-${{ github.run_number }}
+          name: Ritmo-${{ env.APP_VERSION }}
           path: dist/*.apk
+
+      # One release per version (v1.2, v1.3…). Pushing again with the same
+      # version replaces that release's APK instead of creating a new one.
+      - name: Point the version tag at this build
+        run: |
+          git tag -f "v$APP_VERSION"
+          git push -f origin "v$APP_VERSION"
 
       - name: Publish as a release (direct download from the phone)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}
-          name: Ritmo · build ${{ github.run_number }}
-          body: Abre este enlace desde el celular, descarga el APK e instálalo.
+          tag_name: v${{ env.APP_VERSION }}
+          name: Ritmo ${{ env.APP_VERSION }}
+          body: Abre este enlace desde el celular, descarga el APK e instálalo encima de la versión anterior.
           files: dist/*.apk
           make_latest: true
+          overwrite_files: true

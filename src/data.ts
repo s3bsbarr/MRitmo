@@ -12,6 +12,19 @@ export type Task = {
   done: boolean;
   doneAt?: number;
   createdAt: number;
+  /** Scheduled start (epoch ms). Absent means "ahora": any time that day. */
+  at?: number;
+};
+
+/** A habit repeats every day; it builds a streak and never counts toward the day's %. */
+export type Habit = {
+  id: string;
+  title: string;
+  /** Optional daily reminder, "HH:MM" 24 h. */
+  time?: string;
+  createdAt: number;
+  /** Days checked, YYYY-MM-DD. */
+  checks: string[];
 };
 
 export type FocusState = {
@@ -20,6 +33,10 @@ export type FocusState = {
   endsAt: number | null;
   /** Remaining ms while paused. */
   remaining: number;
+  /** Full block length in ms, including any extra time added. */
+  total?: number;
+  /** True once the countdown has been started at least once. */
+  started?: boolean;
 };
 
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -32,6 +49,16 @@ export type Settings = {
   onboarded: boolean;
   remindMorning: boolean;
   remindEvening: boolean;
+  /** "HH:MM" 24 h. */
+  planTime: string;
+  closeTime: string;
+  motivationTime: string;
+  remindMotivation: boolean;
+  remindFreeDay: boolean;
+  remindRest: boolean;
+  /** Minutes before a scheduled task to notify; 0 turns it off. */
+  taskLead: number;
+  remindOverdue: boolean;
 };
 
 export const emptyFocus: FocusState = { taskId: null, endsAt: null, remaining: 0 };
@@ -43,11 +70,20 @@ export const defaultSettings: Settings = {
   onboarded: false,
   remindMorning: true,
   remindEvening: true,
+  planTime: '08:00',
+  closeTime: '20:30',
+  motivationTime: '06:30',
+  remindMotivation: true,
+  remindFreeDay: true,
+  remindRest: true,
+  taskLead: 10,
+  remindOverdue: true,
 };
 
 const TASKS_KEY = 'ritmo.tasks.v1';
 const FOCUS_KEY = 'ritmo.focus.v1';
 const SETTINGS_KEY = 'ritmo.settings.v1';
+const HABITS_KEY = 'ritmo.habits.v1';
 // Pre-settings keys from build 1–2, migrated on first read.
 const LEGACY_THEME_KEY = 'ritmo.theme.v1';
 const LEGACY_AVATAR_KEY = 'ritmo.avatar.v1';
@@ -73,11 +109,85 @@ export function progressOf(tasks: Task[]) {
   return { total, done, ratio: total === 0 ? 0 : done / total };
 }
 
+/** Pending first; within each group, scheduled tasks by time, then the rest in creation order. */
 export function tasksForDay(tasks: Task[], day: string) {
   return tasks
     .filter((t) => t.day === day)
-    .sort((a, b) => Number(a.done) - Number(b.done) || a.createdAt - b.createdAt);
+    .sort(
+      (a, b) =>
+        Number(a.done) - Number(b.done) ||
+        (a.at ?? Number.MAX_SAFE_INTEGER) - (b.at ?? Number.MAX_SAFE_INTEGER) ||
+        a.createdAt - b.createdAt,
+    );
 }
+
+/** Tasks scheduled after today, soonest first. */
+export function upcomingTasks(tasks: Task[], today = dayKey()) {
+  return tasks
+    .filter((t) => t.day > today && !t.done)
+    .sort((a, b) => a.day.localeCompare(b.day) || (a.at ?? 0) - (b.at ?? 0) || a.createdAt - b.createdAt);
+}
+
+export function hhmm(time: string) {
+  const [h, m] = time.split(':').map(Number);
+  return { h: Number.isFinite(h) ? h : 0, m: Number.isFinite(m) ? m : 0 };
+}
+
+/** Epoch ms for a YYYY-MM-DD day at "HH:MM" local time. */
+export function atTime(day: string, time: string) {
+  const [y, mo, d] = day.split('-').map(Number);
+  const { h, m } = hhmm(time);
+  return new Date(y, mo - 1, d, h, m, 0, 0).getTime();
+}
+
+/* Habits */
+
+export function streakOf(h: Habit, today = dayKey()) {
+  const set = new Set(h.checks);
+  // An unchecked today does not break the streak yet; count from yesterday.
+  let day = set.has(today) ? today : shiftDay(today, -1);
+  let n = 0;
+  while (set.has(day)) {
+    n++;
+    day = shiftDay(day, -1);
+  }
+  return n;
+}
+
+export function bestStreakOf(h: Habit) {
+  const days = [...new Set(h.checks)].sort();
+  let best = 0;
+  let run = 0;
+  let prev = '';
+  for (const d of days) {
+    run = prev && shiftDay(prev, 1) === d ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = d;
+  }
+  return best;
+}
+
+/** Share of the last `days` days (capped at the habit's age) that were checked. */
+export function consistencyOf(h: Habit, days = 30, today = dayKey()) {
+  const created = dayKey(new Date(h.createdAt));
+  const set = new Set(h.checks);
+  let possible = 0;
+  let hit = 0;
+  for (let i = 0; i < days; i++) {
+    const d = shiftDay(today, -i);
+    if (d < created) break;
+    possible++;
+    if (set.has(d)) hit++;
+  }
+  return possible === 0 ? 0 : hit / possible;
+}
+
+export async function loadHabits(): Promise<Habit[]> {
+  const h = await readJson<Habit[]>(HABITS_KEY, []);
+  return Array.isArray(h) ? h : [];
+}
+
+export const saveHabits = (h: Habit[]) => writeJson(HABITS_KEY, h);
 
 export function nextPending(tasks: Task[], day = dayKey()) {
   return tasksForDay(tasks, day).find((t) => !t.done) ?? null;
@@ -142,11 +252,26 @@ export function remainingOf(f: FocusState, now = Date.now()) {
 
 export function focusOn(tasks: Task[], taskId: string): FocusState {
   const t = tasks.find((x) => x.id === taskId);
-  return t ? { taskId, endsAt: null, remaining: t.minutes * 60_000 } : emptyFocus;
+  if (!t) return emptyFocus;
+  const total = t.minutes * 60_000;
+  return { taskId, endsAt: null, remaining: total, total, started: false };
 }
 
 export function resumeFocus(f: FocusState, now = Date.now()): FocusState {
-  return f.endsAt !== null ? f : { ...f, endsAt: now + f.remaining };
+  return f.endsAt !== null ? f : { ...f, endsAt: now + f.remaining, started: true };
+}
+
+/** Add time to the block. If it already ran out, it restarts counting from now. */
+export function extendFocus(f: FocusState, ms: number, now = Date.now()): FocusState {
+  const total = (f.total ?? f.remaining) + ms;
+  if (f.endsAt !== null) return { ...f, endsAt: Math.max(f.endsAt, now) + ms, total, started: true };
+  return { ...f, remaining: f.remaining + ms, total };
+}
+
+export function totalOf(f: FocusState, tasks: Task[]) {
+  if (f.total) return f.total;
+  const t = tasks.find((x) => x.id === f.taskId);
+  return (t?.minutes ?? 0) * 60_000;
 }
 
 export function pauseFocus(f: FocusState, now = Date.now()): FocusState {

@@ -5,12 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAV_HEIGHT } from '../components/NavBar';
 import { Press } from '../components/Press';
 import { dayInitial, formatMinutes } from '../format';
-import { progressOf, TasksApi } from '../store';
+import { bestStreakOf, consistencyOf, shiftDay, streakOf } from '../data';
+import { Habit, progressOf, TasksApi } from '../store';
 import { radius, space, type, useTheme } from '../theme';
 
 const CHART_H = 140;
 
-export function Summary({ api, name, onOpenSettings }: { api: TasksApi; name: string; onOpenSettings: () => void }) {
+export function Summary({ api, habits, name, onOpenSettings }: { api: TasksApi; habits: Habit[]; name: string; onOpenSettings: () => void }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { week, todayTasks } = api;
@@ -115,6 +116,60 @@ export function Summary({ api, name, onOpenSettings }: { api: TasksApi; name: st
           </View>
         ))}
       </View>
+
+      {habits.length > 0 && (
+        <>
+          <Text style={[type.headline, { color: c.text, marginTop: space.xxl, marginBottom: space.md }]}>Hábitos</Text>
+          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+            {habits.map((h, i) => {
+              const streak = streakOf(h, api.today);
+              const best = bestStreakOf(h);
+              const pct = Math.round(consistencyOf(h, 30, api.today) * 100);
+              const last7 = Array.from({ length: 7 }, (_, k) => shiftDay(api.today, k - 6));
+              return (
+                <View
+                  key={h.id}
+                  style={{
+                    paddingVertical: space.md + 2,
+                    marginLeft: space.lg,
+                    paddingRight: space.lg,
+                    borderBottomWidth: i === habits.length - 1 ? 0 : 1,
+                    borderBottomColor: c.separator,
+                  }}
+                  accessible
+                  accessibilityLabel={`${h.title}: racha de ${streak} días, mejor racha ${best}, constancia de ${pct} por ciento en 30 días`}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[type.body, { color: c.text, flex: 1 }]} numberOfLines={1}>
+                      {h.title}
+                    </Text>
+                    <Ionicons name="flame" size={18} color={c.text} />
+                    <Text style={[type.headline, { color: c.text, marginLeft: 3, fontVariant: ['tabular-nums'] }]}>{streak}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: space.sm }}>
+                    <View style={{ flexDirection: 'row', gap: 5, flex: 1 }}>
+                      {last7.map((d) => (
+                        <View
+                          key={d}
+                          style={{
+                            width: 14,
+                            height: 14,
+                            borderRadius: 4,
+                            backgroundColor: h.checks.includes(d) ? c.ink : c.track,
+                          }}
+                        />
+                      ))}
+                    </View>
+                    <Text style={[type.footnote, { color: c.textSecondary, fontVariant: ['tabular-nums'] }]}>
+                      Mejor {best} · 30 días {pct}%
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       <Press
         onPress={share}

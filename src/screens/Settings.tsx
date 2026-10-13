@@ -5,6 +5,8 @@ import { Linking, Platform, ScrollView, Switch, Text, TextInput, View } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../avatar/Avatar';
 import { Press } from '../components/Press';
+import { TimeField } from '../components/TimeField';
+import { hhmmLabel } from '../format';
 import type { Gender, Settings as SettingsT, ThemePref } from '../data';
 import { requestNotificationPermission } from '../effects';
 import { font, radius, space, type, useTheme } from '../theme';
@@ -23,6 +25,42 @@ function Section({ title, children, note }: { title: string; children: React.Rea
       <Text style={[type.headline, { color: c.text, marginBottom: space.md }]}>{title}</Text>
       {children}
       {note ? <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.sm }]}>{note}</Text> : null}
+    </View>
+  );
+}
+
+/** A reminder with an on/off switch and a time you can open and edit in place. */
+function TimedToggle({ label, detail, on, time, onToggle, onTime }: { label: string; detail: string; on: boolean; time: string; onToggle: (v: boolean) => void; onTime: (t: string) => void }) {
+  const { c } = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ borderBottomWidth: 1, borderBottomColor: c.separator, marginLeft: space.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 60, paddingRight: space.md }}>
+        <View style={{ flex: 1, paddingVertical: space.sm }}>
+          <Text style={[type.body, { color: c.text }]}>{label}</Text>
+          <Press onPress={() => setOpen(!open)} disabled={!on} scaleTo={0.97} accessibilityRole="button" accessibilityLabel={`Cambiar hora de ${label}`} style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 }}>
+            <Text style={[type.footnote, { color: on ? c.text : c.textTertiary, fontFamily: 'Inter_600SemiBold', textDecorationLine: on ? 'underline' : 'none' }]}>{hhmmLabel(time)}</Text>
+            <Text style={[type.footnote, { color: c.textSecondary }]}>· {detail}</Text>
+          </Press>
+        </View>
+        <Switch
+          value={on}
+          onValueChange={(v) => {
+            Haptics.selectionAsync().catch(() => {});
+            onToggle(v);
+            if (!v) setOpen(false);
+          }}
+          accessibilityLabel={label}
+          trackColor={{ false: c.track, true: c.ink }}
+          thumbColor={Platform.OS === 'android' ? c.bg : undefined}
+          ios_backgroundColor={c.track}
+        />
+      </View>
+      {open && on && (
+        <View style={{ paddingRight: space.md, paddingBottom: space.md }}>
+          <TimeField value={time} onChange={onTime} />
+        </View>
+      )}
     </View>
   );
 }
@@ -217,7 +255,7 @@ export function SettingsScreen({ settings, update, onClose }: Props) {
           title="Notificaciones"
           note={
             notifState === 'granted'
-              ? 'Cuando un bloque de foco termina, siempre te avisamos.'
+              ? 'Cuando un bloque de foco termina siempre suena un aviso, con botones para sumar tiempo o terminar. Toca una hora para cambiarla.'
               : 'Sin permiso no podemos avisarte cuando termina un bloque ni recordarte planear tu día.'
           }
         >
@@ -233,8 +271,36 @@ export function SettingsScreen({ settings, update, onClose }: Props) {
             </Press>
           )}
           <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
-            <ToggleRow label="Planear el día" detail="Todos los días a las 8:00 a. m." value={settings.remindMorning} onChange={(v) => update({ remindMorning: v })} />
-            <ToggleRow label="Cerrar el día" detail="Todos los días a las 8:30 p. m." value={settings.remindEvening} onChange={(v) => update({ remindEvening: v })} last />
+            <TimedToggle label="Motivación" detail="Un mensaje para empezar" on={settings.remindMotivation} time={settings.motivationTime}
+              onToggle={(v) => update({ remindMotivation: v })} onTime={(t) => update({ motivationTime: t })} />
+            <TimedToggle label="Planear el día" detail="Tus tareas del día" on={settings.remindMorning} time={settings.planTime}
+              onToggle={(v) => update({ remindMorning: v })} onTime={(t) => update({ planTime: t })} />
+            <TimedToggle label="Cerrar el día" detail="Lo pendiente y tus hábitos" on={settings.remindEvening} time={settings.closeTime}
+              onToggle={(v) => update({ remindEvening: v })} onTime={(t) => update({ closeTime: t })} />
+            <ToggleRow label="Día libre" detail="A las 10:00 a. m. si no tienes tareas" value={settings.remindFreeDay} onChange={(v) => update({ remindFreeDay: v })} />
+            <ToggleRow label="Tarea sin empezar" detail="5 minutos después de su hora" value={settings.remindOverdue} onChange={(v) => update({ remindOverdue: v })} />
+            <ToggleRow label="Descanso" detail="15 min después de cerrar un día al 100 %" value={settings.remindRest} onChange={(v) => update({ remindRest: v })} last />
+          </View>
+          <Text style={[type.callout, { color: c.text, marginTop: space.xl, marginBottom: space.sm }]}>Aviso antes de una tarea programada</Text>
+          <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.md, padding: 4 }} accessibilityRole="radiogroup">
+            {[0, 5, 10, 15].map((m) => {
+              const active = settings.taskLead === m;
+              return (
+                <Press
+                  key={m}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    update({ taskLead: m });
+                  }}
+                  scaleTo={0.96}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  style={{ flex: 1, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: active ? c.bg : 'transparent' }}
+                >
+                  <Text style={[type.callout, { color: active ? c.text : c.textSecondary }]}>{m === 0 ? 'No' : `${m} min`}</Text>
+                </Press>
+              );
+            })}
           </View>
         </Section>
 
@@ -250,7 +316,7 @@ export function SettingsScreen({ settings, update, onClose }: Props) {
           </Section>
         )}
 
-        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.1</Text>
+        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo 1.2</Text>
       </ScrollView>
     </View>
   );

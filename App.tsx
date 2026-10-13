@@ -7,17 +7,19 @@ import * as SystemUI from 'expo-system-ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AddSheet } from './src/components/AddSheet';
+import { applyAction, resyncAll } from './src/actions';
+import { AddSheet, NewItem } from './src/components/AddSheet';
+import { ConfirmRequest, ConfirmSheet } from './src/components/ConfirmSheet';
 import { BlurTargetContext } from './src/components/Glass';
 import { NavBar, Tab } from './src/components/NavBar';
 import { defaultSettings, emptyFocus, FocusState, loadFocus, loadSettings, saveFocus, saveSettings, Settings, ThemePref } from './src/data';
-import { configureNotifications, refreshWidgets, syncFocus, syncReminders } from './src/effects';
+import { configureNotifications, onAppBackground, onAppForeground } from './src/effects';
 import { Focus } from './src/screens/Focus';
 import { SettingsScreen } from './src/screens/Settings';
 import { Summary } from './src/screens/Summary';
 import { Today } from './src/screens/Today';
 import { Welcome } from './src/screens/Welcome';
-import { useTasks } from './src/store';
+import { useHabits, useTasks } from './src/store';
 import { palettes, ThemeContext } from './src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -27,88 +29,109 @@ export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
   const system = useColorScheme();
   const api = useTasks();
+  const habitsApi = useHabits();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [tab, setTab] = useState<Tab>('hoy');
   const [adding, setAdding] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [focus, setFocusState] = useState<FocusState>(emptyFocus);
   const target = useRef<View>(null);
-  const tasksRef = useRef(api.tasks);
-  tasksRef.current = api.tasks;
+
+  const snapRef = useRef({ tasks: api.tasks, habits: habitsApi.habits, focus, settings });
+  snapRef.current = { tasks: api.tasks, habits: habitsApi.habits, focus, settings };
 
   useEffect(() => {
     Promise.all([loadSettings(), loadFocus()]).then(([s, f]) => {
       setSettings(s);
       setFocusState(f);
       setSettingsLoaded(true);
-      syncReminders(s);
     });
   }, []);
 
-  /** Every focus change is persisted and mirrored to the live notification and widgets. */
+  const ready = fontsLoaded && api.ready && habitsApi.ready && settingsLoaded;
+
+  // Any change in tasks, habits, focus or settings re-plans notifications, the
+  // live timer and widgets from the same state, a moment after the last edit.
+  useEffect(() => {
+    if (!ready) return;
+    const id = setTimeout(() => resyncAll(snapRef.current), 450);
+    return () => clearTimeout(id);
+  }, [ready, api.tasks, habitsApi.habits, focus, settings]);
+
   const setFocus = useCallback((f: FocusState) => {
     setFocusState(f);
-    saveFocus(f).then(() => {
-      syncFocus(f, tasksRef.current);
-      refreshWidgets();
-    });
+    saveFocus(f);
   }, []);
 
   const update = useCallback((patch: Partial<Settings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
-      saveSettings(next).then(() => {
-        syncReminders(next);
-        refreshWidgets();
-      });
+      saveSettings(next);
       return next;
     });
   }, []);
 
-  // A widget can start, pause or finish a task while the app is closed: re-read on return.
+  // The task and habit hooks return new objects every render; keep their reload
+  // functions in a ref so listeners below are registered exactly once.
+  const reloaders = useRef({ tasks: api.reload, habits: habitsApi.reload });
+  reloaders.current = { tasks: api.reload, habits: habitsApi.reload };
+
+  /** Re-read everything a widget or a notification button may have changed. */
+  const reloadAll = useCallback(async () => {
+    const [, , f] = await Promise.all([reloaders.current.tasks(), reloaders.current.habits(), loadFocus()]);
+    setFocusState(f);
+  }, []);
+
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (state) => {
-      if (state !== 'active') return;
-      const [tasks, f] = await Promise.all([api.reload(), loadFocus()]);
-      setFocusState(f);
-      syncFocus(f, tasks);
+      if (state === 'active') {
+        await onAppForeground();
+        await reloadAll();
+      } else if (state === 'background') {
+        onAppBackground(snapRef.current);
+      }
     });
     return () => sub.remove();
-  }, [api]);
+  }, [reloadAll]);
 
-  // Keep the live notification honest when a task is completed or deleted from a list.
-  useEffect(() => {
-    if (settingsLoaded && api.ready) syncFocus(focus, api.tasks);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api.tasks]);
+  // ritmo://hoy, ritmo://foco, ritmo://resumen and ritmo://nueva come from widgets and notifications.
+  const route = useCallback((url: string | null | undefined) => {
+    if (!url || !url.startsWith('ritmo://')) return;
+    const path = url.replace(/^ritmo:\/\//, '').split(/[?#/]/)[0];
+    setShowSettings(false);
+    if (path === 'foco') setTab('foco');
+    else if (path === 'resumen') setTab('resumen');
+    else if (path === 'nueva') {
+      setTab('hoy');
+      setAdding(true);
+    } else if (path === 'hoy') setTab('hoy');
+  }, []);
 
-  // ritmo://hoy, ritmo://foco and ritmo://nueva come from widgets and notifications.
   useEffect(() => {
-    const route = (url: string | null | undefined) => {
-      if (!url) return;
-      const path = url.replace(/^ritmo:\/\//, '').split(/[?#/]/)[0];
-      setShowSettings(false);
-      if (path === 'foco') setTab('foco');
-      else if (path === 'resumen') setTab('resumen');
-      else if (path === 'nueva') {
-        setTab('hoy');
-        setAdding(true);
-      } else if (path === 'hoy') setTab('hoy');
-    };
     Linking.getInitialURL().then(route).catch(() => {});
     const linkSub = Linking.addEventListener('url', (e) => route(e.url));
     let notifSub: { remove: () => void } | null = null;
     if (Platform.OS !== 'web') {
-      notifSub = Notifications.addNotificationResponseReceivedListener((r) => {
-        route(r.notification.request.content.data?.url as string | undefined);
-      });
+      const onResponse = async (r: Notifications.NotificationResponse) => {
+        const data = (r.notification.request.content.data ?? {}) as { url?: string; taskId?: string; habitId?: string };
+        if (r.actionIdentifier && r.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+          await applyAction(r.actionIdentifier, data);
+          await reloadAll();
+          Notifications.dismissNotificationAsync(r.notification.request.identifier).catch(() => {});
+        } else route(data.url);
+      };
+      Notifications.getLastNotificationResponseAsync()
+        .then((r) => r && r.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER && route((r.notification.request.content.data as { url?: string })?.url))
+        .catch(() => {});
+      notifSub = Notifications.addNotificationResponseReceivedListener(onResponse);
     }
     return () => {
       linkSub.remove();
       notifSub?.remove();
     };
-  }, []);
+  }, [route, reloadAll]);
 
   const scheme = settings.theme === 'system' ? (system === 'dark' ? 'dark' : 'light') : settings.theme;
   const c = palettes[scheme];
@@ -122,7 +145,6 @@ export default function App() {
     SystemUI.setBackgroundColorAsync(c.bg).catch(() => {});
   }, [c.bg]);
 
-  const ready = fontsLoaded && api.ready && settingsLoaded;
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
   }, [ready]);
@@ -132,8 +154,16 @@ export default function App() {
   const openFocus = (id: string) => {
     const t = api.tasks.find((x) => x.id === id);
     if (!t) return;
-    if (focus.taskId !== id) setFocus({ taskId: id, endsAt: null, remaining: t.minutes * 60_000 });
+    if (focus.taskId !== id) {
+      const total = t.minutes * 60_000;
+      setFocus({ taskId: id, endsAt: null, remaining: total, total, started: false });
+    }
     setTab('foco');
+  };
+
+  const onAdd = (item: NewItem) => {
+    if (item.kind === 'habit') habitsApi.add(item.title, item.time);
+    else api.add(item.title, item.minutes, item.day, item.at);
   };
 
   if (!settings.onboarded) {
@@ -153,9 +183,19 @@ export default function App() {
         <BlurTargetContext.Provider value={target}>
           <View style={{ flex: 1, backgroundColor: c.bg }}>
             <BlurTargetView ref={target} style={{ flex: 1, backgroundColor: c.bg }}>
-              {tab === 'hoy' && <Today api={api} gender={settings.gender} name={settings.name} onAdd={() => setAdding(true)} onFocus={openFocus} />}
+              {tab === 'hoy' && (
+                <Today
+                  api={api}
+                  habitsApi={habitsApi}
+                  gender={settings.gender}
+                  name={settings.name}
+                  onAdd={() => setAdding(true)}
+                  onFocus={openFocus}
+                  onConfirm={setConfirm}
+                />
+              )}
               {tab === 'foco' && <Focus api={api} focus={focus} setFocus={setFocus} />}
-              {tab === 'resumen' && <Summary api={api} name={settings.name} onOpenSettings={() => setShowSettings(true)} />}
+              {tab === 'resumen' && <Summary api={api} habits={habitsApi.habits} name={settings.name} onOpenSettings={() => setShowSettings(true)} />}
             </BlurTargetView>
             {!showSettings && <NavBar tab={tab} onTab={setTab} onAdd={() => setAdding(true)} />}
             {showSettings && (
@@ -163,7 +203,8 @@ export default function App() {
                 <SettingsScreen settings={settings} update={update} onClose={() => setShowSettings(false)} />
               </View>
             )}
-            <AddSheet visible={adding} onClose={() => setAdding(false)} onAdd={api.add} />
+            <AddSheet visible={adding} onClose={() => setAdding(false)} onAdd={onAdd} />
+            <ConfirmSheet request={confirm} onClose={() => setConfirm(null)} />
             <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
           </View>
         </BlurTargetContext.Provider>

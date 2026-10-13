@@ -12,7 +12,7 @@ import { radius, space, type, useTheme } from '../theme';
 
 export { emptyFocus } from '../data';
 export type { FocusState } from '../data';
-import type { FocusState } from '../data';
+import { emptyFocus as EMPTY, extendFocus, focusOn, pauseFocus, resumeFocus, totalOf, type FocusState } from '../data';
 
 type Props = { api: TasksApi; focus: FocusState; setFocus: (f: FocusState) => void };
 
@@ -31,7 +31,7 @@ export function Focus({ api, focus, setFocus }: Props) {
     return () => clearInterval(id);
   }, [focus.endsAt]);
 
-  const totalMs = (task?.minutes ?? 0) * 60_000;
+  const totalMs = totalOf(focus, api.tasks);
   const remaining = focus.endsAt !== null ? Math.max(0, focus.endsAt - now) : focus.remaining;
   const running = focus.endsAt !== null && remaining > 0;
   const finished = task !== null && remaining === 0;
@@ -48,23 +48,30 @@ export function Focus({ api, focus, setFocus }: Props) {
     if (!t) return;
     firedFor.current = null;
     Haptics.selectionAsync().catch(() => {});
-    setFocus({ taskId: id, endsAt: null, remaining: t.minutes * 60_000 });
+    setFocus(focusOn(api.tasks, id));
   };
 
   const startPause = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    if (running) setFocus({ ...focus, endsAt: null, remaining });
+    if (running) setFocus(pauseFocus(focus));
     else {
       setNow(Date.now());
-      setFocus({ ...focus, endsAt: Date.now() + remaining });
+      setFocus(resumeFocus(focus));
     }
+  };
+
+  const addFive = () => {
+    Haptics.selectionAsync().catch(() => {});
+    firedFor.current = null;
+    setNow(Date.now());
+    setFocus(extendFocus(focus, 5 * 60_000));
   };
 
   const completeTask = () => {
     if (!task) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     api.complete(task.id);
-    setFocus({ taskId: null, endsAt: null, remaining: 0 });
+    setFocus(EMPTY);
   };
 
   return (
@@ -99,7 +106,7 @@ export function Focus({ api, focus, setFocus }: Props) {
             <ProgressBar ratio={totalMs === 0 ? 0 : 1 - remaining / totalMs} height={4} />
           </View>
           <Text style={[type.footnote, { color: c.textSecondary, textAlign: 'center', marginTop: space.md }]}>
-            {finished ? 'Tiempo cumplido.' : running ? 'En curso' : remaining === totalMs ? `Bloque de ${formatShort(task.minutes)}` : 'En pausa'}
+            {finished ? 'Tiempo cumplido.' : running ? 'En curso' : !focus.started ? `Bloque de ${formatShort(Math.round(totalMs / 60000))}` : 'En pausa'}
           </Text>
 
           <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.xxl }}>
@@ -110,7 +117,7 @@ export function Focus({ api, focus, setFocus }: Props) {
                 style={{ flex: 1, height: 56, borderRadius: radius.pill, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: space.sm }}
               >
                 <Ionicons name={running ? 'pause' : 'play'} size={18} color={c.inkOnInk} />
-                <Text style={[type.headline, { color: c.inkOnInk }]}>{running ? 'Pausar' : remaining === totalMs ? 'Empezar' : 'Seguir'}</Text>
+                <Text style={[type.headline, { color: c.inkOnInk }]}>{running ? 'Pausar' : !focus.started ? 'Empezar' : 'Seguir'}</Text>
               </Press>
             )}
             <Press
@@ -132,9 +139,17 @@ export function Focus({ api, focus, setFocus }: Props) {
             </Press>
           </View>
 
-          <Press onPress={() => setFocus({ taskId: null, endsAt: null, remaining: 0 })} style={{ alignSelf: 'center', marginTop: space.xl, padding: space.sm }}>
-            <Text style={[type.callout, { color: c.textSecondary }]}>Cambiar de tarea</Text>
-          </Press>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: space.xl, marginTop: space.xl }}>
+            {(running || finished) && (
+              <Press onPress={addFive} accessibilityRole="button" style={{ padding: space.sm, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="add-circle-outline" size={18} color={c.text} />
+                <Text style={[type.callout, { color: c.text }]}>5 min</Text>
+              </Press>
+            )}
+            <Press onPress={() => setFocus(EMPTY)} style={{ padding: space.sm }}>
+              <Text style={[type.callout, { color: c.textSecondary }]}>Cambiar de tarea</Text>
+            </Press>
+          </View>
         </View>
       ) : (
         <View style={{ marginTop: space.xl }}>
