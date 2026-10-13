@@ -3,6 +3,10 @@ name: Build APK
 on:
   push:
     branches: [main]
+    # Docs-only commits don't need a new APK.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:
