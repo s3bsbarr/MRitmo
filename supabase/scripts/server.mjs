@@ -104,11 +104,13 @@ async function auth() {
   patch.uri_allow_list = [...allow].join(',');
 
   if (user && pass) {
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     Object.assign(patch, {
-      smtp_host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      smtp_host: host,
       smtp_port: String(process.env.SMTP_PORT || '465'),
       smtp_user: user,
-      smtp_pass: pass.replace(/\s+/g, ''),
+      // Gmail app passwords are shown with spaces that don't count; any other password is used as is.
+      smtp_pass: /gmail\.com$/i.test(host) ? pass.replace(/\s+/g, '') : pass,
       smtp_admin_email: process.env.SMTP_FROM || user,
       smtp_sender_name: process.env.SMTP_SENDER_NAME || 'MRitmo',
       smtp_max_frequency: 30,
