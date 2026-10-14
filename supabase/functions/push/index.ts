@@ -90,6 +90,9 @@ function serviceKey() {
   try {
     const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}');
     if (typeof keys.default === 'string' && keys.default) return keys.default as string;
+    // After a key rotation there may be no key named "default": use any secret key.
+    const any = Object.values(keys).find((v) => typeof v === 'string' && v);
+    if (any) return any as string;
   } catch {
     // fall through to the legacy key
   }
