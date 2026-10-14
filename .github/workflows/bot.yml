@@ -11,6 +11,9 @@ name: Amigo bot
 #   habito     the bot invites you to a shared habit (title in "usuario", optional)
 #   marcar     the bot marks its shared habits today ("Amigo Bot ya marcó, faltas tú")
 #   sala       the bot creates a room and invites you (room name in "usuario", optional)
+#   ocultar    the bot hides (or shows again) its progress: "Avance oculto" on your board (1.9)
+#   bloquear   the bot blocks you (or unblocks you): it disappears from your board and search (1.9)
+#   borrar     deletes the bot's account like "Eliminar cuenta" (1.9); "preparar" creates it again
 #   estado     the bot's last days and the last notifications sent
 #
 # Its progress also moves by itself every minute from 7:00 to 21:00 (Bogotá).
@@ -23,7 +26,7 @@ on:
         description: Qué hacer
         type: choice
         default: estado
-        options: [preparar, solicitud, avanzar, completar, quitar, habito, marcar, sala, estado]
+        options: [preparar, solicitud, avanzar, completar, quitar, habito, marcar, sala, ocultar, bloquear, borrar, estado]
       usuario:
         description: Tu @usuario (para "preparar"), el título del hábito ("habito") o el nombre de la sala ("sala")
         type: string
@@ -44,8 +47,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Supabase client (only to create the bot's account)
-        if: inputs.accion == 'preparar'
+      - name: Supabase client (only to create or delete the bot's account)
+        if: inputs.accion == 'preparar' || inputs.accion == 'borrar'
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Run

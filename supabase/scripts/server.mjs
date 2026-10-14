@@ -6,7 +6,8 @@
  *   node supabase/scripts/server.mjs migrate          apply new files in supabase/migrations
  *   node supabase/scripts/server.mjs auth             emails (templates + SMTP), redirect URLs, OTP
  *   node supabase/scripts/server.mjs bot <action> [@usuario]
- *        actions: preparar · solicitud · avanzar · completar · quitar · habito · marcar · sala · estado
+ *        actions: preparar · solicitud · avanzar · completar · quitar · habito · marcar · sala ·
+ *                 ocultar · bloquear · borrar · estado
  *
  * Everything goes through the Supabase Management API, so no database
  * password, Docker or local install is needed.
@@ -207,6 +208,30 @@ async function bot(action, rawUser) {
     case 'sala': {
       const name = String(rawUser ?? '').trim();
       summary(`- ${await one(name ? `select public.ritmo_bot_room(${lit(name)})` : 'select public.ritmo_bot_room()')}`);
+      break;
+    }
+    case 'ocultar':
+      summary(`- ${await one('select public.ritmo_bot_hide()')}`);
+      break;
+    case 'bloquear':
+      summary(`- ${await one('select public.ritmo_bot_block()')}`);
+      break;
+    case 'borrar': {
+      // Deletes the bot's account the same way "Eliminar cuenta" does in the app,
+      // to test what friends and rooms see when someone deletes their account.
+      const found = await sql('select b.id, p.username from public.ritmo_bot b join public.profiles p on p.id = b.id limit 1');
+      const id = found?.[0]?.id;
+      if (!id) throw new Error('El bot no existe. Ejecuta "preparar" para crearlo.');
+      const owned = await one(`select count(*) from public.rooms where owner = ${lit(id)}`);
+      const { createClient } = await import('@supabase/supabase-js');
+      const admin = createClient(`https://${REF}.supabase.co`, await secretKey(), {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { error } = await admin.auth.admin.deleteUser(id);
+      if (error) throw new Error(`No se pudo borrar la cuenta del bot: ${error.message}`);
+      summary('- Cuenta de Amigo Bot eliminada (como "Eliminar cuenta" en la app).');
+      summary(`- Sus salas (${owned}) pasaron al miembro más antiguo o se borraron si estaba sola.`);
+      summary('- En la app: debe desaparecer de tu ranking, de tus salas y sus hábitos juntos. Vuelve a crearla con "preparar".');
       break;
     }
     case 'estado': {
