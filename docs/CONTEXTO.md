@@ -135,7 +135,7 @@ La **2.0** será la primera versión que Sebas comparta con amigos: todo lo soci
 | **1.6** (construida) | Perfil de amigo (hoja), infraestructura push, correo propio, cuenta de prueba "amigo bot". |
 | **1.7** (construida) | Hábitos compartidos con racha (hoja de amigo, Hoy, push de invitación, aceptación y "ya marcó, faltas tú" con botones). Temporizador en vivo con números grandes (MetricStyle, Android 17) y pantalla completa al tocarlo. "Revisa tu correo" sin código mientras no haya correo propio. |
 | **1.8** (construida) | Salas con ranking propio, enlace de invitación `mritmo.com/u/usuario` que abre "Agregar a @usuario", ranking semanal, web en mritmo.com, correo propio desde soporte@mritmo.com. Las salas no se recortaron. |
-| **1.9** | Onboarding post-registro; controles de privacidad (ocultar avance, bloquear); eliminar cuenta y datos desde la app; aviso de nueva versión consultando GitHub Releases; casos límite (sin conexión, medianoche, cuenta eliminada). |
+| **1.9** | Onboarding post-registro; controles de privacidad (ocultar avance, bloquear); eliminar cuenta y datos desde la app (pasando antes las salas al miembro más antiguo); aviso de nueva versión leyendo `mritmo.com/version.json`; casos límite (sin conexión, medianoche, cuenta eliminada). Web: `/novedades`, `/eliminar-cuenta`, `/ayuda`, imagen para compartir (og:image 1200×630, también para `/u/<usuario>`), aviso para iPhone, SHA-256 del APK en `version.json`. App: apariencia **"Crema (prueba)"** en Configuración, solo para que Sebas la pruebe (no oficial). |
 | **2.0** | Solo correcciones, instrucciones de instalación del APK y notas de versión para alguien que no es Sebas. |
 
 **Regla de recorte:** si hay que recortar para que la 2.0 salga sólida, lo primero que se mueve a la 2.1 son las **salas**.
@@ -168,6 +168,9 @@ Notas de diseño para las siguientes versiones:
 - **Datos del responsable (decisión de Sebas, 14 oct 2026):** se queda como "persona natural con domicilio en Bogotá D.C." + soporte@mritmo.com; prefiere no publicar nombre, dirección ni teléfono. El Decreto 1377 los pide: riesgo bajo mientras sea un proyecto gratuito entre conocidos; si crece o llega a Play Store, añadirlos en la sección 1 de `site/privacidad/` y de `site/terminos/` (puede ser una dirección de correspondencia y un número solo para MRitmo).
 - **Marca "MRitmo" (decisión de Sebas):** sin registrar por ahora. Se registrará cuando la app genere ingresos. Si se registra: SIC, pago único por clase (unos $1,37 millones COP en 2026 por clase, clases 9 y 42), vigencia 10 años, renovable.
 - **Si cambian los términos o la privacidad en lo sustancial:** subir `LEGAL_VERSION` en `src/sync.ts`, cambiar la fecha/versión de las páginas y avisar en la app.
+
+### Llave secreta de Supabase (14 oct 2026)
+- La llave secreta **default** (`sb_secret_n67W…`) quedó escrita en un chat en la época de la 1.5. La función `push` ya no depende de su nombre (usa cualquier llave secreta vigente; desplegada). Queda la llave **second** (`sb_secret_FzUs0…`). **Pendiente:** borrar "default" en Supabase → Settings → API Keys y comprobar las push con una acción del amigo bot. La app usa la publishable y no se afecta.
 
 ### Token de Supabase (14 oct 2026)
 - El secreto `SUPABASE_ACCESS_TOKEN` de GitHub quedó dañado ("JWT could not be decoded") y por eso falló el despliegue del servidor del commit de la 1.8 (salas sin aplicar en la base real).
