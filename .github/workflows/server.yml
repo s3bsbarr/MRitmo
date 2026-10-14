@@ -68,12 +68,12 @@ jobs:
         run: node supabase/scripts/server.mjs auth
 
       - uses: supabase/setup-cli@v1
-        if: steps.token.outputs.ok == 'true'
+        if: always() && steps.token.outputs.ok == 'true'
         with:
           version: latest
 
       - name: Edge Functions
-        if: steps.token.outputs.ok == 'true'
+        if: always() && steps.token.outputs.ok == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           EXPO_ACCESS_TOKEN: ${{ secrets.EXPO_ACCESS_TOKEN }}

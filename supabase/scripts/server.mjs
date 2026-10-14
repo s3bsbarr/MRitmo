@@ -82,13 +82,20 @@ async function auth() {
   const { emails } = await import(join(ROOT, 'supabase', 'templates', 'emails.mjs'));
   const current = await api('/config/auth');
 
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const hasSmtp = Boolean((user && pass) || current.smtp_host);
+
   const patch = {
     mailer_otp_length: 6,
     mailer_otp_exp: 3600,
   };
-  for (const [kind, { subject, content }] of Object.entries(emails)) {
-    patch[`mailer_subjects_${kind}`] = subject;
-    patch[`mailer_templates_${kind}_content`] = content;
+  // Supabase only allows custom templates with your own SMTP (free plan).
+  if (hasSmtp) {
+    for (const [kind, { subject, content }] of Object.entries(emails)) {
+      patch[`mailer_subjects_${kind}`] = subject;
+      patch[`mailer_templates_${kind}_content`] = content;
+    }
   }
 
   // The app's deep link must be an allowed redirect, or links fall back to the site URL.
@@ -96,8 +103,6 @@ async function auth() {
   for (const u of ['ritmo://auth', 'ritmo://**']) allow.add(u);
   patch.uri_allow_list = [...allow].join(',');
 
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
   if (user && pass) {
     Object.assign(patch, {
       smtp_host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -116,7 +121,11 @@ async function auth() {
   }
 
   await api('/config/auth', { method: 'PATCH', body: JSON.stringify(patch) });
-  summary(`- Plantillas en español subidas (${Object.keys(emails).length}). Código de 6 dígitos, válido 1 hora.`);
+  summary(
+    hasSmtp
+      ? `- Plantillas en español subidas (${Object.keys(emails).length}). Código de 6 dígitos, válido 1 hora.`
+      : '- Plantillas pendientes: Supabase solo las permite con SMTP propio. Se suben solas cuando agregues SMTP_USER y SMTP_PASS.',
+  );
   summary(`- Redirecciones permitidas: ${patch.uri_allow_list}`);
 }
 
