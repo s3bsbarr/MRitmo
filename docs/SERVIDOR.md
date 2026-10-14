@@ -24,7 +24,7 @@ Desde la 1.6 el servidor (base de datos, correos, notificaciones push, amigo bot
 3. myaccount.google.com/apppasswords → nombre `Supabase MRitmo` → **Crear** → copia las 16 letras.
 4. En GitHub crea `SMTP_USER` (el Gmail completo) y `SMTP_PASS` (las 16 letras; los espacios no importan).
 
-El flujo "Servidor (Supabase)" configura lo demás: `smtp.gmail.com:465`, remitente "MRitmo", plantillas en español, código de 6 dígitos válido 1 hora, `ritmo://auth` como redirección permitida y 60 correos por hora (Gmail permite ~500 al día).
+Mientras no haya correo propio, la app no pide código en "Revisa tu correo" (solo el enlace); el flujo "Servidor (Supabase)" guarda esa bandera (`app_flags.email_code`) y la cambia solo al agregar el SMTP. El flujo configura lo demás: `smtp.gmail.com:465`, remitente "MRitmo", plantillas en español, código de 6 dígitos válido 1 hora, `ritmo://auth` como redirección permitida y 60 correos por hora (Gmail permite ~500 al día).
 
 **Al comprar el dominio:** cambia `SMTP_USER` y `SMTP_PASS`, agrega `SMTP_HOST` y `SMTP_PORT` del proveedor (y `SMTP_FROM` si el remitente es distinto del usuario) y vuelve a ejecutar el flujo. No hay que tocar código.
 
@@ -52,7 +52,7 @@ Si una migración falla por extensiones: Supabase → Database → Extensions �
 
 ## 6. Amigo bot
 
-Cuenta de prueba `@amigobot` ("Amigo Bot", personaje mujer). Su avance se mueve solo cada minuto de 7:00 a 21:00 (Bogotá), entra en foco los primeros 25 minutos de cada hora y acepta sola las solicitudes que le envíes (en menos de un minuto).
+Cuenta de prueba `@amigobot` ("Amigo Bot", personaje mujer). Su avance se mueve solo cada minuto de 7:00 a 21:00 (Bogotá), entra en foco los primeros 25 minutos de cada hora y acepta sola las solicitudes que le envíes (en menos de un minuto). Desde la 1.7 también acepta las invitaciones a hábitos juntos y marca sus hábitos un minuto después de aceptarlos (entre 7:00 y 21:00).
 
 Se maneja desde **Actions → Amigo bot → Run workflow** (app de GitHub o github.com en el navegador del teléfono):
 
@@ -63,4 +63,6 @@ Se maneja desde **Actions → Amigo bot → Run workflow** (app de GitHub o gith
 | `avanzar` | +30 min a su día y la pone en foco 25 min. |
 | `completar` | Termina su día (100 %). |
 | `quitar` | Elimina la amistad. Agrégala desde la app y te acepta sola: prueba "Amigo Bot aceptó tu solicitud". |
-| `estado` | Sus últimos días y las últimas notificaciones enviadas con su resultado (`ok 1/1`, `no devices`, `muted`…). |
+| `habito` | Te invita a un hábito juntos (escribe el título en el campo "usuario"; vacío = "Leer 20 minutos"). Prueba la invitación con el botón Aceptar. |
+| `marcar` | Marca hoy sus hábitos juntos. Si tú no has marcado: "Amigo Bot ya marcó…, faltas tú" con el botón Hecho. Se puede repetir. |
+| `estado` | Sus últimos días, sus hábitos juntos y las últimas notificaciones enviadas con su resultado (`ok 1/1`, `no devices`, `muted`…). |
