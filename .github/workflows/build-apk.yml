@@ -131,7 +131,11 @@ jobs:
 
       # One release per version (v1.2, v1.3…). Pushing again with the same
       # version replaces that release's APK instead of creating a new one.
+      # GitHub refuses to move a tag with the workflow token when the new commit changes
+      # files in .github/workflows (it needs the "workflows" permission). In that case the
+      # tag stays where it was and the release below still gets this build's APK.
       - name: Point the version tag at this build
+        continue-on-error: true
         run: |
           git tag -f "v$APP_VERSION"
           git push -f origin "v$APP_VERSION"
