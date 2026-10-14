@@ -1,0 +1,43 @@
+name: Web (mritmo.com)
+
+# Publishes site/ to the "web" branch, with the site at the branch root.
+# Hostinger (hPanel → mritmo.com → Avanzado → GIT) deploys that branch to
+# public_html, so changing anything in site/ on main updates mritmo.com.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the site
+        run: |
+          python3 -m json.tool site/.well-known/assetlinks.json > /dev/null
+          test -f site/index.html && test -f site/u/index.html && test -f site/.htaccess
+
+      - name: Push site/ to the web branch
+        run: |
+          cd site
+          git init -q -b web
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "mritmo.com desde ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" web
+          echo "- Rama \`web\` actualizada con \`site/\` (${GITHUB_SHA::7})." >> "$GITHUB_STEP_SUMMARY"

@@ -10,6 +10,9 @@ on:
       - 'supabase/**'
       - '.github/workflows/server.yml'
       - '.github/workflows/bot.yml'
+      - '.github/workflows/web.yml'
+      - 'site/**'
+      - 'tools/site-sprites.mjs'
   workflow_dispatch:
 
 permissions:
