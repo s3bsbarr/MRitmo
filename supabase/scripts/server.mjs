@@ -6,7 +6,7 @@
  *   node supabase/scripts/server.mjs migrate          apply new files in supabase/migrations
  *   node supabase/scripts/server.mjs auth             emails (templates + SMTP), redirect URLs, OTP
  *   node supabase/scripts/server.mjs bot <action> [@usuario]
- *        actions: preparar · solicitud · avanzar · completar · quitar · habito · marcar · estado
+ *        actions: preparar · solicitud · avanzar · completar · quitar · habito · marcar · sala · estado
  *
  * Everything goes through the Supabase Management API, so no database
  * password, Docker or local install is needed.
@@ -202,6 +202,11 @@ async function bot(action, rawUser) {
     case 'marcar':
       summary(`- ${await one('select public.ritmo_bot_check()')}`);
       break;
+    case 'sala': {
+      const name = String(rawUser ?? '').trim();
+      summary(`- ${await one(name ? `select public.ritmo_bot_room(${lit(name)})` : 'select public.ritmo_bot_room()')}`);
+      break;
+    }
     case 'estado': {
       const rows = await sql(`
         select p.day, p.done_minutes, p.total_minutes, p.focus_until > now() as en_foco

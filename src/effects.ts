@@ -49,6 +49,8 @@ export const CAT = {
   /** Server push (1.7): ids must match categoryId in supabase/functions/push. */
   sharedInvite: 'ritmo_shared_invite',
   sharedNudge: 'ritmo_shared_nudge',
+  /** 1.8: "X te invitó a una sala", with "Unirme". */
+  roomInvite: 'ritmo_room_invite',
 };
 
 export const ACTION = {
@@ -62,6 +64,7 @@ export const ACTION = {
   checkHabit: 'CHECK_HABIT',
   acceptShared: 'ACCEPT_SHARED',
   checkShared: 'CHECK_SHARED',
+  joinRoom: 'JOIN_ROOM',
 } as const;
 
 const CHIME = 'ritmo_chime.wav';
@@ -103,7 +106,7 @@ function setup() {
       }).catch(() => {});
       await Notifications.setNotificationChannelAsync(CH.friends, {
         name: 'Amigos',
-        description: 'Solicitudes de amistad, quién te acepta y hábitos juntos.',
+        description: 'Solicitudes de amistad, quién te acepta, hábitos juntos y salas.',
         importance: Notifications.AndroidImportance.HIGH,
         sound: SOFT,
       }).catch(() => {});
@@ -129,6 +132,9 @@ function setup() {
     ]).catch(() => {});
     await Notifications.setNotificationCategoryAsync(CAT.sharedNudge, [
       { identifier: ACTION.checkShared, buttonTitle: 'Hecho', options: bg },
+    ]).catch(() => {});
+    await Notifications.setNotificationCategoryAsync(CAT.roomInvite, [
+      { identifier: ACTION.joinRoom, buttonTitle: 'Unirme', options: bg },
     ]).catch(() => {});
   })();
   return setupDone;

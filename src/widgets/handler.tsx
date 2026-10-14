@@ -11,7 +11,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
 
   let snap;
   if (widgetAction === 'WIDGET_CLICK' && clickAction) {
-    const payload = (clickActionData ?? {}) as { taskId?: string; habitId?: string; sharedId?: string };
+    const payload = (clickActionData ?? {}) as { taskId?: string; habitId?: string; sharedId?: string; roomId?: string };
     snap = await applyAction(clickAction, payload, { immediate: true });
   } else {
     snap = await loadSnapshot();

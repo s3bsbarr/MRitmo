@@ -24,7 +24,57 @@ export type FriendsState = {
   incoming: Profile[];
   outgoing: Profile[];
   progress: Record<string, { done: number; total: number; focusUntil: number | null }>;
+  /** This week so far (Monday to today), summed (1.8). */
+  week: Record<string, { done: number; total: number }>;
 };
+
+/** Board period: today, or this week from Monday (1.8). */
+export type Period = 'day' | 'week';
+
+/** Monday of the week that holds `today` (weeks run Monday to Sunday). */
+export function weekStartOf(today = dayKey()) {
+  const [y, m, d] = today.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // 0 = Sunday
+  return shiftDay(today, -((dow + 6) % 7));
+}
+
+/** Your own week, from your days (and today live). */
+export function weekOfMine(history: DayProgress[], todayLive: { done: number; total: number }, today = dayKey()) {
+  const from = weekStartOf(today);
+  let done = Math.round(todayLive.done);
+  let total = Math.round(todayLive.total);
+  for (const d of history) {
+    if (d.day < from || d.day >= today) continue;
+    done += d.done;
+    total += d.total;
+  }
+  return { done, total };
+}
+
+type Live = { done: number; total: number; focusUntil: number | null };
+
+/**
+ * Rank people by the share of planned time they've done (today or this week),
+ * then by minutes. Used by the friends board and by every room.
+ */
+export function rankRows(
+  people: Profile[],
+  me: Profile,
+  mine: { today: Live; week: { done: number; total: number } },
+  progress: { today: Record<string, Live>; week: Record<string, { done: number; total: number }> },
+  period: Period,
+): BoardRow[] {
+  const pick = (today: Live | undefined, week: { done: number; total: number } | undefined) => {
+    const t = today ?? { done: 0, total: 0, focusUntil: null };
+    const v = period === 'day' ? t : (week ?? { done: 0, total: 0 });
+    return { done: v.done, total: v.total, focusUntil: t.focusUntil, ratio: v.total ? Math.min(1, v.done / v.total) : 0 };
+  };
+  const rows: BoardRow[] = [
+    { profile: me, me: true, ...pick(mine.today, mine.week) },
+    ...people.filter((p) => p.id !== me.id).map((p) => ({ profile: p, me: false, ...pick(progress.today[p.id], progress.week[p.id]) })),
+  ];
+  return rows.sort((a, b) => b.ratio - a.ratio || b.done - a.done || Number(b.me) - Number(a.me));
+}
 
 export const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 
@@ -109,7 +159,7 @@ export async function removeFriend(otherId: string) {
 }
 
 export async function loadFriends(): Promise<FriendsState> {
-  const empty: FriendsState = { me: null, friends: [], incoming: [], outgoing: [], progress: {} };
+  const empty: FriendsState = { me: null, friends: [], incoming: [], outgoing: [], progress: {}, week: {} };
   const id = await myId();
   if (!id) return empty;
   const me = await getMyProfile();
@@ -130,13 +180,20 @@ export async function loadFriends(): Promise<FriendsState> {
   }
 
   const progress: FriendsState['progress'] = {};
+  const week: FriendsState['week'] = {};
   if (friendIds.length) {
+    const today = dayKey();
     const { data } = await supabase
       .from('day_progress')
-      .select('user_id, done_minutes, total_minutes, focus_until')
-      .eq('day', dayKey())
+      .select('user_id, day, done_minutes, total_minutes, focus_until')
+      .gte('day', weekStartOf(today))
+      .lte('day', today)
       .in('user_id', friendIds);
     for (const r of data ?? []) {
+      const w = (week[r.user_id] ??= { done: 0, total: 0 });
+      w.done += r.done_minutes;
+      w.total += r.total_minutes;
+      if (r.day !== today) continue;
       progress[r.user_id] = {
         done: r.done_minutes,
         total: r.total_minutes,
@@ -146,20 +203,18 @@ export async function loadFriends(): Promise<FriendsState> {
   }
 
   const pick = (list: string[]) => list.map((x) => profiles[x]).filter(Boolean);
-  return { me, friends: pick(friendIds), incoming: pick(incomingIds), outgoing: pick(outgoingIds), progress };
+  return { me, friends: pick(friendIds), incoming: pick(incomingIds), outgoing: pick(outgoingIds), progress, week };
 }
 
-/** Today's board: you plus friends, highest share of the day first. */
-export function boardOf(st: FriendsState, mine: { done: number; total: number; focusUntil: number | null }): BoardRow[] {
+/** The friends board: you plus friends, highest share first (today by default, or this week). */
+export function boardOf(
+  st: FriendsState,
+  mine: { done: number; total: number; focusUntil: number | null },
+  period: Period = 'day',
+  myWeek: { done: number; total: number } = mine,
+): BoardRow[] {
   if (!st.me) return [];
-  const rows: BoardRow[] = [
-    { profile: st.me, me: true, ...mine, ratio: mine.total ? mine.done / mine.total : 0 },
-    ...st.friends.map((p) => {
-      const pr = st.progress[p.id] ?? { done: 0, total: 0, focusUntil: null };
-      return { profile: p, me: false, ...pr, ratio: pr.total ? pr.done / pr.total : 0 };
-    }),
-  ];
-  return rows.sort((a, b) => b.ratio - a.ratio || b.done - a.done || Number(b.me) - Number(a.me));
+  return rankRows(st.friends, st.me, { today: mine, week: myWeek }, { today: st.progress, week: st.week }, period);
 }
 
 export type DayProgress = { day: string; done: number; total: number };

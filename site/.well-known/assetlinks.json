@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.sebas.ritmo",
+      "sha256_cert_fingerprints": [
+        "29:1A:8E:DA:60:E9:1A:55:DB:4A:83:1F:BA:D6:04:D9:75:B0:56:52:F4:6A:8F:13:98:22:7B:AA:DD:E2:CA:CB"
+      ]
+    }
+  }
+]

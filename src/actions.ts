@@ -22,6 +22,7 @@ import {
   saveTasks,
 } from './data';
 import { ACTION, refreshWidgets, Snapshot, syncFocus, syncSchedule } from './effects';
+import { joinRoom } from './rooms';
 import { acceptShared, activeShared, fetchShared, loadSharedCache, setSharedMark } from './shared';
 
 export async function loadSnapshot(): Promise<Snapshot> {
@@ -44,9 +45,15 @@ export async function resyncAll(snap?: Snapshot, opts: { immediate?: boolean } =
   return s;
 }
 
-export type ActionPayload = { taskId?: string; habitId?: string; sharedId?: string };
+export type ActionPayload = { taskId?: string; habitId?: string; sharedId?: string; roomId?: string };
 
 export async function applyAction(action: string, payload: ActionPayload = {}, opts: { immediate?: boolean } = {}) {
+  // A room invitation's "Unirme" (from a push): straight to the server.
+  if (action === ACTION.joinRoom) {
+    if (payload.roomId) await joinRoom(payload.roomId).catch(() => {});
+    return loadSnapshot();
+  }
+
   // Shared habits live on the server: these buttons (from a push) write there, app open or closed.
   if (action === ACTION.acceptShared || action === ACTION.checkShared) {
     if (payload.sharedId) {

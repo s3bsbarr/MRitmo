@@ -90,7 +90,7 @@ export async function savePushPrefs(prefs: { friends: boolean; habits: boolean }
 export function pushStatusLabel(s: PushStatus, kind: 'friends' | 'habits' = 'friends'): string {
   switch (s.state) {
     case 'ready':
-      return kind === 'habits' ? 'Invitaciones y "ya marcó, faltas tú", con la app cerrada' : 'Solicitudes y quién te acepta, con la app cerrada';
+      return kind === 'habits' ? 'Invitaciones y "ya marcó, faltas tú", con la app cerrada' : 'Solicitudes, quién te acepta y salas, con la app cerrada';
     case 'checking':
       return 'Conectando este teléfono…';
     case 'signed-out':

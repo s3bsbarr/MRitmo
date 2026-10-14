@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MRitmo · Mide tu día en tiempo</title>
+  <meta name="description" content="MRitmo mide tu día en tiempo, no en número de tareas. Foco con temporizador en vivo, hábitos con racha y ranking con amigos. App para Android.">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="MRitmo">
+  <meta property="og:description" content="Mide tu día en tiempo, no en tareas.">
+  <meta property="og:image" content="https://mritmo.com/icon.png">
+  <link rel="icon" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/"><img src="/icon.png" alt="" width="30" height="30">MRitmo</a>
+      <a class="small" href="#instalar">Cómo instalar</a>
+    </header>
+
+    <main>
+      <h1>Mide tu día en tiempo, no en tareas.</h1>
+      <p class="lead">Cada tarea lleva su duración. Tu avance es el tiempo que ya cumpliste: dos horas pesan más que quince minutos.</p>
+
+      <div class="stage" aria-label="El personaje de MRitmo cambia de postura según tu avance: dormido al 0 %, sentado al empezar, de pie y concentrado desde la mitad, y con los brazos arriba al 100 %.">
+        <div class="pose"><canvas data-gender="m" data-mood="sueno" width="24" height="26"></canvas><span>0 %</span></div>
+        <div class="pose"><canvas data-gender="f" data-mood="calma" width="24" height="26"></canvas><span>30 %</span></div>
+        <div class="pose"><canvas data-gender="m" data-mood="foco" width="24" height="26"></canvas><span>70 %</span></div>
+        <div class="pose"><canvas data-gender="f" data-mood="fuerza" width="24" height="26"></canvas><span>100 %</span></div>
+      </div>
+
+      <div class="cta">
+        <a class="btn" href="/descargar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+          Descargar para Android
+        </a>
+        <span class="faint" data-version>Última versión, directo desde GitHub</span>
+      </div>
+
+      <section>
+        <div class="grid">
+          <div class="card"><h3>Hoy</h3><p>Planea tu día con la duración de cada tarea. El % solo mide tiempo; los hábitos llevan su propia racha.</p></div>
+          <div class="card"><h3>Foco</h3><p>Temporizador con la duración de la tarea, en la barra de estado y la Now Bar, aunque cierres la app.</p></div>
+          <div class="card"><h3>Amigos y salas</h3><p>Ranking del día y de la semana, con amigos o en salas. Solo se comparte el % y los minutos, nunca tus tareas.</p></div>
+          <div class="card"><h3>Hábitos juntos</h3><p>Un hábito con un amigo y una racha que solo avanza el día que los dos cumplen.</p></div>
+        </div>
+      </section>
+
+      <section id="instalar">
+        <h2>Cómo instalar</h2>
+        <p class="muted">MRitmo todavía no está en Play Store: se instala con el archivo APK. Hazlo desde el celular Android.</p>
+        <ol class="steps">
+          <li><div><b>Descarga el APK.</b><p>Toca "Descargar para Android" en esta página, desde el celular. Es un archivo de unos 40 MB.</p></div></li>
+          <li><div><b>Ábrelo.</b><p>Toca la notificación de descarga o búscalo en Archivos → Descargas. Si Android lo pide, permite "Instalar apps desconocidas" para tu navegador.</p></div></li>
+          <li><div><b>Instala.</b><p>Si aparece Play Protect, toca "Más detalles" → "Instalar de todas formas". La app está firmada siempre con la misma llave.</p></div></li>
+          <li><div><b>Abre MRitmo y crea tu cuenta.</b><p>Tus tareas, hábitos y ajustes quedan respaldados. Si cambias de celular, inicias sesión y vuelve todo.</p></div></li>
+        </ol>
+        <p class="faint" style="margin-top:14px">Para actualizar, descarga la versión nueva e instálala encima: no pierdes nada. Requiere Android 7 o superior.</p>
+      </section>
+    </main>
+
+    <footer>
+      <span>MRitmo · Bogotá</span>
+      <a href="mailto:soporte@mritmo.com">soporte@mritmo.com</a>
+      <a href="https://github.com/s3bsbarr/MRitmo/releases">Todas las versiones</a>
+    </footer>
+  </div>
+  <script src="/sprites.js"></script>
+  <script src="/site.js"></script>
+</body>
+</html>

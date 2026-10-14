@@ -1,0 +1,33 @@
+# MRitmo · mritmo.com (Hostinger, LiteSpeed/Apache)
+Options -Indexes
+DirectoryIndex index.html
+
+AddType application/json .json
+AddDefaultCharset utf-8
+
+RewriteEngine On
+
+# assetlinks.json must answer directly on both hosts, without redirects,
+# or Android won't verify the App Links (mritmo.com/u/<usuario>).
+RewriteRule ^\.well-known/ - [L]
+
+# A single host: www.mritmo.com → mritmo.com. (HTTPS is forced from hPanel → SSL,
+# not here: behind Hostinger's CDN an HTTPS check in .htaccess can loop.)
+RewriteCond %{HTTP_HOST} ^www\. [NC]
+RewriteRule ^(.*)$ https://mritmo.com/$1 [R=301,L]
+
+# Always the newest APK (every release also publishes it as MRitmo.apk).
+RewriteRule ^descargar/?$ https://github.com/s3bsbarr/MRitmo/releases/latest/download/MRitmo.apk [R=302,L]
+
+# Invitation link: mritmo.com/u/<usuario> → the bridge page (the address stays the same).
+RewriteRule ^u/[A-Za-z0-9_.]+/?$ /u/index.html [L]
+
+<IfModule mod_headers.c>
+  <Files "assetlinks.json">
+    Header set Content-Type "application/json"
+    Header set Access-Control-Allow-Origin "*"
+  </Files>
+  <FilesMatch "\.(html)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

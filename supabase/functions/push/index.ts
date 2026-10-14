@@ -9,6 +9,7 @@
  *
  * Adding a new kind = one entry in MESSAGES (+ its push_enqueue in a trigger).
  * 1.7: habit_invite, habit_accepted, habit_nudge (preference "habits").
+ * 1.8: room_invite (preference "friends").
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -66,6 +67,14 @@ const MESSAGES: Record<string, (c: Claim) => Message> = {
     body: 'Ya está en el Hoy de los dos. La racha empieza cuando ambos lo marquen.',
     url: 'ritmo://hoy',
     channelId: 'ritmo_friends',
+  }),
+  room_invite: (c) => ({
+    pref: 'friends',
+    title: `${c.actor_name} te invitó a ${typeof c.payload?.name === 'string' && c.payload.name ? `«${c.payload.name}»` : 'una sala'}`,
+    body: 'Una sala con su propio ranking del día y de la semana. Solo se ve el % y los minutos.',
+    url: typeof c.payload?.room_id === 'string' ? `ritmo://salas/${c.payload.room_id}` : 'ritmo://amigos',
+    channelId: 'ritmo_friends',
+    categoryId: 'ritmo_room_invite',
   }),
   habit_nudge: (c) => ({
     pref: 'habits',
@@ -134,7 +143,12 @@ Deno.serve(async (req) => {
     to,
     title: msg.title,
     body: msg.body,
-    data: { url: msg.url, kind: claim.kind, ...(typeof claim.payload?.habit_id === 'string' ? { sharedId: claim.payload.habit_id } : {}) },
+    data: {
+      url: msg.url,
+      kind: claim.kind,
+      ...(typeof claim.payload?.habit_id === 'string' ? { sharedId: claim.payload.habit_id } : {}),
+      ...(typeof claim.payload?.room_id === 'string' ? { roomId: claim.payload.room_id } : {}),
+    },
     channelId: msg.channelId,
     ...(msg.categoryId ? { categoryId: msg.categoryId } : {}),
     priority: 'high',

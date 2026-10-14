@@ -54,6 +54,8 @@ export default function App() {
   const [push, setPush] = useState<PushStatus>({ state: 'checking' });
   const [openFriendId, setOpenFriendId] = useState<string | null>(null);
   const [focusFull, setFocusFull] = useState(false);
+  const [openRoomId, setOpenRoomId] = useState<string | null>(null);
+  const [addUsername, setAddUsername] = useState<string | null>(null);
   const sharedApi = useShared(Boolean(account.email));
 
   const snapRef = useRef({ tasks: api.tasks, habits: habitsApi.habits, focus, settings, shared: sharedApi.active });
@@ -194,8 +196,12 @@ export default function App() {
   }, [reloadAll, runSync, refreshPush]);
 
   // ritmo://hoy, ritmo://foco, ritmo://resumen and ritmo://nueva come from widgets and notifications.
+  // https://mritmo.com/u/<usuario> (Android App Link) and ritmo://agregar/<usuario> open "Agregar a @usuario".
   const route = useCallback((url: string | null | undefined) => {
-    if (!url || !url.startsWith('ritmo://')) return;
+    if (!url) return;
+    const web = url.match(/^https:\/\/(?:www\.)?mritmo\.com\/u\/([^/?#]+)/i);
+    if (web) url = `ritmo://agregar/${web[1]}`;
+    if (!url.startsWith('ritmo://')) return;
     if (url.startsWith('ritmo://auth')) {
       // A link from an account email opened the app: activation, sign-in, or password reset.
       handleAuthUrl(url).then((r) => {
@@ -229,6 +235,13 @@ export default function App() {
       // ritmo://amigos/<id> opens that friend's sheet (e.g. "X aceptó tu solicitud").
       if (param && /^[0-9a-f-]{36}$/i.test(param)) setOpenFriendId(param);
     }
+    else if (path === 'agregar' && param) {
+      setTab('amigos');
+      setAddUsername(decodeURIComponent(param));
+    } else if (path === 'salas' && param && /^[0-9a-f-]{36}$/i.test(param)) {
+      setTab('amigos');
+      setOpenRoomId(param);
+    }
     else if (path === 'resumen') setTab('resumen');
     else if (path === 'nueva') {
       setTab('hoy');
@@ -242,7 +255,7 @@ export default function App() {
     let notifSub: { remove: () => void } | null = null;
     if (Platform.OS !== 'web') {
       const onResponse = async (r: Notifications.NotificationResponse) => {
-        const data = (r.notification.request.content.data ?? {}) as { url?: string; taskId?: string; habitId?: string; sharedId?: string };
+        const data = (r.notification.request.content.data ?? {}) as { url?: string; taskId?: string; habitId?: string; sharedId?: string; roomId?: string };
         if (r.actionIdentifier && r.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
           await applyAction(r.actionIdentifier, data);
           await reloadAll();
@@ -358,6 +371,10 @@ export default function App() {
                   openFriendId={openFriendId}
                   onFriendOpened={() => setOpenFriendId(null)}
                   sharedApi={sharedApi}
+                  openRoomId={openRoomId}
+                  onRoomOpened={() => setOpenRoomId(null)}
+                  addUsername={addUsername}
+                  onAddHandled={() => setAddUsername(null)}
                 />
               )}
               {tab === 'resumen' && <Summary api={api} habits={habitsApi.habits} name={settings.name} onOpenSettings={() => setShowSettings(true)} />}

@@ -115,6 +115,9 @@ jobs:
             echo "::warning::Sin llave propia configurada: el APK queda firmado con la llave de pruebas."
             cp "$APK" "$OUT"
           fi
+          # Same file under a fixed name: mritmo.com/descargar and the site's button point to
+          # releases/latest/download/MRitmo.apk, so they always serve the newest version.
+          cp "$OUT" dist/MRitmo.apk
           ls -lh dist
 
       - uses: actions/upload-artifact@v5
@@ -134,7 +137,9 @@ jobs:
         with:
           tag_name: v${{ env.APP_VERSION }}
           name: MRitmo ${{ env.APP_VERSION }}
-          body: Abre este enlace desde el celular, descarga el APK e instálalo encima de la versión anterior.
+          body: |
+            Abre este enlace desde el celular, descarga el APK e instálalo encima de la versión anterior.
+            También se descarga siempre la última versión desde https://mritmo.com/descargar ("MRitmo.apk" es el mismo archivo que "MRitmo-${{ env.APP_VERSION }}.apk").
           files: dist/*.apk
           make_latest: true
           overwrite_files: true
