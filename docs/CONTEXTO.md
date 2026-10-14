@@ -146,6 +146,9 @@ Notas de diseño para las siguientes versiones:
 ### Correo propio: en espera hasta el dominio
 Decisión (13 oct 2026): no se crea un Gmail para la app; el correo propio se configura con el correo corporativo cuando se compre mritmo.com (noviembre). Mientras tanto Supabase envía sus correos por defecto (en inglés, sin el código de 6 dígitos, con límite bajo por hora; el enlace funciona). Las plantillas en español ya están en el repo y se suben solas al agregar `SMTP_USER`, `SMTP_PASS`, `SMTP_HOST` y `SMTP_PORT`. **Debe quedar listo antes de la 2.0.** Si antes de eso el límite de correos estorba, la salida es desactivar temporalmente "Confirm email" en Supabase (Authentication → Sign In / Providers → Email) para que crear cuenta no dependa del correo.
 
+### Dominio y web (plan de Sebas)
+mritmo.com irá en uno de los dos espacios libres de su hosting de Hostinger (plan de 3 sitios). Allí vivirán: la página de MRitmo con la descarga del APK e instrucciones de instalación (2.0), la página puente del enlace de invitación (1.8: `mritmo.com/u/usuario` abre la app en "Agregar a @usuario" o lleva a la descarga si no la tiene) y el correo corporativo, cuyo SMTP de Hostinger se usará en Supabase. El servidor de la app sigue en Supabase; Hostinger solo sirve páginas y correo. Lo que no depende del dominio (1.7 completa, ranking semanal, salas) se construye sin esperarlo.
+
 ### Por verificar en 1.6 y 1.7
 - Supabase, Firebase y Expo ya están configurados (13 oct 2026): secretos `SUPABASE_ACCESS_TOKEN`, `GOOGLE_SERVICES_JSON` y variable `EXPO_PROJECT_ID` en GitHub; clave FCM V1 en el proyecto de Expo `@sebasbarrs-team/mritmo` (paquete `com.sebas.ritmo`); migraciones 1.6 aplicadas y función `push` desplegada. APK `MRitmo-1.6.apk` compilado con push.
 - Amigo bot preparado con @sebas (13 oct 2026, flujo "Amigo bot" → preparar): le envió una solicitud.
