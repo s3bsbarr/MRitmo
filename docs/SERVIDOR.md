@@ -5,28 +5,33 @@ Desde la 1.6 el servidor (base de datos, correos, notificaciones push, amigo bot
 | Nombre | Tipo | Para qué |
 |---|---|---|
 | `SUPABASE_ACCESS_TOKEN` | Secret | Aplicar migraciones, subir correos, desplegar funciones, manejar el bot |
-| `SMTP_USER` | Secret | Gmail de la app (remitente de los correos) |
-| `SMTP_PASS` | Secret | Contraseña de aplicación de ese Gmail (16 letras) |
+| `SMTP_USER` | Secret | Buzón que envía los correos: `soporte@mritmo.com` |
+| `SMTP_PASS` | Secret | Contraseña de ese buzón (la pega Sebas) |
+| `SMTP_HOST`, `SMTP_PORT` | Secret | `smtp.hostinger.com` y `465` |
 | `GOOGLE_SERVICES_JSON` | Secret | Contenido completo de `google-services.json` (Firebase) |
 | `EXPO_PROJECT_ID` | **Variable** (pestaña Variables) | ID del proyecto de Expo, para los tokens push |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_SENDER_NAME` | Secret, opcionales | Solo al pasar a un dominio propio |
+| `SMTP_FROM`, `SMTP_SENDER_NAME` | Secret, opcionales | Remitente distinto del buzón (por defecto el mismo) y nombre (por defecto "MRitmo") |
 | `EXPO_ACCESS_TOKEN` | Secret, opcional | Solo si activas "enhanced push security" en Expo |
 
 ## 1. Supabase (2 min)
 
-1. Entra a supabase.com/dashboard/account/tokens → **Generate new token** → nombre `GitHub MRitmo` → copia el token (solo se muestra una vez).
-2. En GitHub crea el secreto `SUPABASE_ACCESS_TOKEN` con ese valor.
+1. Entra a supabase.com/dashboard/account/tokens → **Generate new token** → nombre `GitHub MRitmo 1.8` → copia el token (solo se muestra una vez).
+2. En GitHub crea o edita el secreto `SUPABASE_ACCESS_TOKEN` con ese valor (pégalo completo, empieza por `sbp_`). Si el flujo dice "JWT could not be decoded", el secreto quedó mal pegado.
+3. Con el flujo funcionando, borra los tokens viejos en esa misma página.
 
-## 2. Correo con Gmail (5 min)
+## 2. Correo propio con Hostinger (desde la 1.8)
 
-1. Crea una cuenta de Gmail solo para la app (por ejemplo `mritmo.app@gmail.com`).
-2. En esa cuenta: myaccount.google.com/security → **Verificación en dos pasos** → actívala (Google lo exige para el paso 3).
-3. myaccount.google.com/apppasswords → nombre `Supabase MRitmo` → **Crear** → copia las 16 letras.
-4. En GitHub crea `SMTP_USER` (el Gmail completo) y `SMTP_PASS` (las 16 letras; los espacios no importan).
+Los correos de la cuenta (activar, entrar sin contraseña, nueva contraseña) salen de **soporte@mritmo.com** por el SMTP de Hostinger.
 
-Mientras no haya correo propio, la app no pide código en "Revisa tu correo" (solo el enlace); el flujo "Servidor (Supabase)" guarda esa bandera (`app_flags.email_code`) y la cambia solo al agregar el SMTP. El flujo configura lo demás: `smtp.gmail.com:465`, remitente "MRitmo", plantillas en español, código de 6 dígitos válido 1 hora, `ritmo://auth` como redirección permitida y 60 correos por hora (Gmail permite ~500 al día).
+1. hPanel → **Emails** → mritmo.com: el buzón `soporte@mritmo.com` ya existe (el plan permite 2).
+2. En GitHub: `SMTP_USER` = `soporte@mritmo.com`, `SMTP_HOST` = `smtp.hostinger.com`, `SMTP_PORT` = `465` (ya están), y `SMTP_PASS` = la contraseña del buzón (la pega Sebas; nunca se escribe en un chat).
+3. GitHub → Actions → **Servidor (Supabase)** → Run workflow. El resumen debe decir "SMTP propio con soporte@mritmo.com", "Plantillas en español subidas" y "los correos traen código, la app lo pide".
 
-**Al comprar el dominio:** cambia `SMTP_USER` y `SMTP_PASS`, agrega `SMTP_HOST` y `SMTP_PORT` del proveedor (y `SMTP_FROM` si el remitente es distinto del usuario) y vuelve a ejecutar el flujo. No hay que tocar código.
+El flujo configura: remitente "MRitmo", plantillas en español, código de 6 dígitos válido 1 hora, `ritmo://auth` como redirección permitida, 60 correos por hora, y la bandera `app_flags.email_code` que hace que la app pida el código en "Revisa tu correo".
+
+**DNS (hPanel → Dominios → mritmo.com → DNS):** ya están SPF (`v=spf1 include:_spf.mail.hostinger.com ~all`), DKIM (CNAME `hostingermail-a`, `-b` y `-c._domainkey`) y DMARC (`_dmarc`, hoy `p=none`). No hay que tocarlos para que los correos lleguen; cuando un correo real confirme que DKIM pasa, DMARC puede subir a `p=quarantine`.
+
+**Para cambiar el buzón** (por ejemplo a hola@mritmo.com): crea el buzón en hPanel, cambia `SMTP_USER` y `SMTP_PASS` y vuelve a ejecutar el flujo. No hay que tocar código.
 
 ## 3. Firebase (5 min)
 
@@ -65,4 +70,5 @@ Se maneja desde **Actions → Amigo bot → Run workflow** (app de GitHub o gith
 | `quitar` | Elimina la amistad. Agrégala desde la app y te acepta sola: prueba "Amigo Bot aceptó tu solicitud". |
 | `habito` | Te invita a un hábito juntos (escribe el título en el campo "usuario"; vacío = "Leer 20 minutos"). Prueba la invitación con el botón Aceptar. |
 | `marcar` | Marca hoy sus hábitos juntos. Si tú no has marcado: "Amigo Bot ya marcó…, faltas tú" con el botón Hecho. Se puede repetir. |
+| `sala` | Crea una sala y te invita (nombre en el campo "usuario"; vacío = "Sala de prueba"). Prueba la invitación con el botón Unirme; la sala aparece en Amigos → Salas. |
 | `estado` | Sus últimos días, sus hábitos juntos y las últimas notificaciones enviadas con su resultado (`ok 1/1`, `no devices`, `muted`…). |
