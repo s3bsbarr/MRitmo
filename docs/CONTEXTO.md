@@ -153,19 +153,21 @@ Notas de diseño para las siguientes versiones:
 - **Dominio:** mritmo.com comprado en Hostinger (octubre, por promoción, en vez de noviembre). Sitio PHP/HTML en el plan Premium de Hostinger (uno de los espacios libres). DNS en Hostinger (nameservers `dns-parking.com`), con CDN de Hostinger y SSL.
 - **Web publicada:** portada con el estilo de la app (personaje en 4 estados, "Descargar para Android" con versión y tamaño leídos de GitHub Releases, cómo instalar), puente `/u/<usuario>` y `assetlinks.json`. Google ya verifica el vínculo mritmo.com ↔ `com.sebas.ritmo` (API Digital Asset Links). Para cambiar la web basta con editar `site/` en main: el flujo actualiza la rama `web` y Hostinger la despliega.
 - **Correo:** buzón `soporte@mritmo.com` (plan Starter Business Email, 2 buzones; queda 1 libre). Decisión de Sebas: los correos de la app salen de soporte@ (no se creó hola@). Al haber SMTP, el flujo del servidor sube las plantillas y pone `app_flags.email_code = true`, y la app vuelve a pedir el código.
-- **DMARC:** está en `p=none` (solo observa). Cuando un correo real de la app confirme que DKIM pasa con mritmo.com, subirlo a `p=quarantine`.
+- **Correo verificado (14 oct 2026):** un "Entrar sin contraseña" real llegó a Gmail en **Principal** (no spam), en español, con código de 6 dígitos y remitente "MRitmo" <soporte@mritmo.com>; Gmail marcó **SPF pass, DKIM pass (d=mritmo.com, selector hostingermail-a) y DMARC pass**.
+- Problema encontrado y resuelto en la prueba: `SMTP_USER` seguía con hola@mritmo.com (de una sesión anterior) y Hostinger rechazaba el inicio de sesión (535). Se corrigió a soporte@ y `server.mjs` ya no le quita los espacios a la contraseña salvo con Gmail.
+- **DMARC (pendiente de Sebas, opcional):** hoy `v=DMARC1; p=none`. Como SPF y DKIM pasan alineados, conviene cambiarlo a `v=DMARC1; p=quarantine` en hPanel → Dominios → mritmo.com → DNS → registro TXT `_dmarc` → Editar (Claude no puede editar DNS).
 - El servidor de la app sigue en Supabase; Hostinger solo sirve páginas y correo.
 
 ### Token de Supabase (14 oct 2026)
 - El secreto `SUPABASE_ACCESS_TOKEN` de GitHub quedó dañado ("JWT could not be decoded") y por eso falló el despliegue del servidor del commit de la 1.8 (salas sin aplicar en la base real).
-- Rotación: Sebas genera un token nuevo en supabase.com/dashboard/account/tokens y lo pega en GitHub; con el despliegue funcionando se borran los dos viejos ("SUPABASE_ACCESS_TOKEN", que quedó escrito en un chat, y "GitHub MRitmo", que nunca se usó).
+- **Rotado (14 oct 2026):** Sebas generó un token nuevo, lo pegó en GitHub y borró el que quedó escrito en un chat; Claude borró "GitHub MRitmo" (nunca usado). Solo existe el token nuevo y el flujo "Servidor (Supabase)" funciona: migración de salas aplicada, plantillas subidas, `email_code` activo, función `push` desplegada.
 
 ### Por verificar (1.6 a 1.8)
 - Supabase, Firebase y Expo ya están configurados (13 oct 2026): secretos `SUPABASE_ACCESS_TOKEN`, `GOOGLE_SERVICES_JSON` y variable `EXPO_PROJECT_ID` en GitHub; clave FCM V1 en el proyecto de Expo `@sebasbarrs-team/mritmo` (paquete `com.sebas.ritmo`); migraciones 1.6 aplicadas y función `push` desplegada. APK `MRitmo-1.6.apk` compilado con push.
 - Amigo bot preparado con @sebas (13 oct 2026, flujo "Amigo bot" → preparar): le envió una solicitud.
 - Probar con el amigo bot: solicitud recibida, aceptada, hoja con racha, foco en vivo, push con la app cerrada.
 - Probar 1.7: crear hábito con Amigo Bot desde su hoja (lo acepta en menos de un minuto → "Amigo Bot aceptó…"; un minuto después marca → "Amigo Bot ya marcó…, faltas tú" con botón Hecho), acción `habito` (invitación con botón Aceptar), racha compartida en Hoy, botones con la app cerrada, "Revisa tu correo" sin código, pantalla completa al tocar la Now Bar, y la plantilla grande cuando llegue One UI 9.
-- Probar 1.8: enlace `mritmo.com/u/sebas` desde otro teléfono o desde WhatsApp (con la app: abre "Agregar a @usuario"; sin la app: página puente), compartir usuario desde Amigos, ranking Hoy | Semana, crear sala con Amigo Bot (la acepta sola) y acción `sala` (push con botón Unirme), correo de prueba desde soporte@ (que no llegue a spam y traiga el código).
+- Probar 1.8: enlace `mritmo.com/u/sebas` desde otro teléfono o desde WhatsApp (con la app: abre "Agregar a @usuario"; sin la app: página puente), compartir usuario desde Amigos, ranking Hoy | Semana, crear sala con Amigo Bot (la acepta sola) y acción `sala` (push con botón Unirme), crear cuenta o "Olvidé mi contraseña" escribiendo el código del correo en la app.
 - Now Bar de Samsung: funciona desde 1.4 (ProgressStyle + opción de desarrollador "Live notifications for all apps"). En 1.5 el acento pasó de azul a blanco.
 
 ### Después de la 2.0
