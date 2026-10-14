@@ -114,7 +114,7 @@ La **2.0** será la primera versión que Sebas comparta con amigos: todo lo soci
 | Versión | Contenido |
 |---|---|
 | **1.6** (construida) | Perfil de amigo (hoja), infraestructura push, correo propio, cuenta de prueba "amigo bot". |
-| **1.7** | Hábitos compartidos con racha (en la hoja de amigo: hábitos compartidos y botón "Crear hábito juntos"; push de invitación y "X ya marcó, faltas tú"). |
+| **1.7** | Hábitos compartidos con racha (en la hoja de amigo: hábitos compartidos y botón "Crear hábito juntos"; push de invitación y "X ya marcó, faltas tú"). Temporizador en vivo expandido: al abrir la notificación en la isla / Now Bar, el temporizador completo ocupa casi todo el espacio, números negros sobre fondo blanco, con los mismos botones de ahora. |
 | **1.8** | Salas con ranking propio, enlace de invitación que abre "Agregar a @usuario", ranking semanal. |
 | **1.9** | Onboarding post-registro; controles de privacidad (ocultar avance, bloquear); eliminar cuenta y datos desde la app; aviso de nueva versión consultando GitHub Releases; casos límite (sin conexión, medianoche, cuenta eliminada). |
 | **2.0** | Solo correcciones, instrucciones de instalación del APK y notas de versión para alguien que no es Sebas. |
@@ -122,12 +122,16 @@ La **2.0** será la primera versión que Sebas comparta con amigos: todo lo soci
 **Regla de recorte:** si hay que recortar para que la 2.0 salga sólida, lo primero que se mueve a la 2.1 son las **salas**.
 
 Notas de diseño para las siguientes versiones:
+- 1.7, temporizador en vivo: Android solo promueve a Live Update (chip y Now Bar) las notificaciones sin vista personalizada y con estilos del sistema (ProgressStyle), y muestra como máximo 3 botones. Un fondo blanco con números negros a medida probablemente exige una vista propia, que haría perder la promoción. Hay que investigar con la documentación vigente de Android 16 / One UI 8.5 qué se puede controlar (cronómetro grande, color, segmentos) y, si hay conflicto, mostrarle a Sebas las dos opciones con capturas antes de decidir.
 - 1.7: la tabla de hábitos compartidos debe vivir en la base (no en `user_state`), porque dos personas la marcan. Reutilizar `push_events` con tipos `habit_invite` y `habit_nudge`, preferencia `habits`, y el espacio `children` de `FriendSheet`.
 - 1.8: el enlace de invitación puede ser `ritmo://agregar/<usuario>` (la ruta ya se parsea con parámetro en `App.tsx`); para que funcione fuera de la app hará falta una página web pequeña que redirija (o el dominio, si ya está comprado).
 - 1.9: eliminar cuenta = Edge Function con llave secreta que borra el usuario de `auth.users` (todo cae en cascada). Bloquear = tabla `blocks` y que `are_friends`/`push_enqueue` la respeten.
 
+### Correo propio: en espera hasta el dominio
+Decisión (13 oct 2026): no se crea un Gmail para la app; el correo propio se configura con el correo corporativo cuando se compre mritmo.com (noviembre). Mientras tanto Supabase envía sus correos por defecto (en inglés, sin el código de 6 dígitos, con límite bajo por hora; el enlace funciona). Las plantillas en español ya están en el repo y se suben solas al agregar `SMTP_USER`, `SMTP_PASS`, `SMTP_HOST` y `SMTP_PORT`. **Debe quedar listo antes de la 2.0.** Si antes de eso el límite de correos estorba, la salida es desactivar temporalmente "Confirm email" en Supabase (Authentication → Sign In / Providers → Email) para que crear cuenta no dependa del correo.
+
 ### Por verificar en 1.6
-- Configurar una vez Supabase, Gmail, Firebase y Expo (`docs/SERVIDOR.md`) y recompilar el APK.
+- Supabase, Firebase y Expo ya están configurados (13 oct 2026): secretos `SUPABASE_ACCESS_TOKEN`, `GOOGLE_SERVICES_JSON` y variable `EXPO_PROJECT_ID` en GitHub; clave FCM V1 en el proyecto de Expo `@sebasbarrs-team/mritmo` (paquete `com.sebas.ritmo`); migraciones 1.6 aplicadas y función `push` desplegada. APK `MRitmo-1.6.apk` compilado con push. Falta: preparar el amigo bot con el @usuario de Sebas y cambiar el token de Supabase (quedó escrito en un chat).
 - Probar con el amigo bot: solicitud recibida, aceptada, hoja con racha, foco en vivo, push con la app cerrada.
 - Now Bar de Samsung: funciona desde 1.4 (ProgressStyle + opción de desarrollador "Live notifications for all apps"). En 1.5 el acento pasó de azul a blanco.
 
