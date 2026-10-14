@@ -288,7 +288,7 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
         <Press
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-            Share.share({ message: `Agrégame en Ritmo: @${me.username}` }).catch(() => {});
+            Share.share({ message: `Agrégame en MRitmo: @${me.username}` }).catch(() => {});
           }}
           accessibilityRole="button"
           accessibilityLabel={`Compartir tu usuario @${me.username}`}

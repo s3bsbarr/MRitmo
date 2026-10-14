@@ -27,7 +27,7 @@ export function Summary({ api, habits, name, onOpenSettings }: { api: TasksApi; 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const pct = Math.round(today.ratio * 100);
     const lines = [
-      name ? `${name} en Ritmo: ${pct}% del día cumplido` : `Mi día en Ritmo: ${pct}% cumplido`,
+      name ? `${name} en MRitmo: ${pct}% del día cumplido` : `Mi día en MRitmo: ${pct}% cumplido`,
       `${formatMinutes(today.done)} de ${formatMinutes(today.total)} planeadas`,
       ...todayTasks.map((t) => `${t.done ? '✓' : '○'} ${t.title} · ${formatMinutes(t.minutes)}`),
     ];

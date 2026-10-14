@@ -73,7 +73,7 @@ jobs:
         run: |
           V=$(node -p "require('./app.json').expo.version")
           echo "APP_VERSION=$V" >> "$GITHUB_ENV"
-          echo "Ritmo $V"
+          echo "MRitmo $V"
 
       - name: Build only for 64-bit ARM phones (faster build, smaller APK)
         run: |
@@ -95,13 +95,13 @@ jobs:
           grep -nE "error|Error|FAILURE|What went wrong|Could not|Exception" build.log | tail -40 | while IFS= read -r line; do echo "::error::$line"; done
           tail -25 build.log | while IFS= read -r line; do echo "::error::$line"; done
 
-      - name: Sign with Ritmo's own key (when the secrets are set)
+      - name: Sign with MRitmo's own key (when the secrets are set)
         env:
           RITMO_KEYSTORE_B64: ${{ secrets.RITMO_KEYSTORE_B64 }}
           RITMO_KEYSTORE_PASSWORD: ${{ secrets.RITMO_KEYSTORE_PASSWORD }}
         run: |
           mkdir -p dist
-          OUT="dist/Ritmo-$APP_VERSION.apk"
+          OUT="dist/MRitmo-$APP_VERSION.apk"
           APK=android/app/build/outputs/apk/release/app-release.apk
           if [ -n "$RITMO_KEYSTORE_B64" ] && [ -n "$RITMO_KEYSTORE_PASSWORD" ]; then
             echo "$RITMO_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/ritmo.jks"
@@ -119,7 +119,7 @@ jobs:
 
       - uses: actions/upload-artifact@v5
         with:
-          name: Ritmo-${{ env.APP_VERSION }}
+          name: MRitmo-${{ env.APP_VERSION }}
           path: dist/*.apk
 
       # One release per version (v1.2, v1.3…). Pushing again with the same
@@ -133,7 +133,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.APP_VERSION }}
-          name: Ritmo ${{ env.APP_VERSION }}
+          name: MRitmo ${{ env.APP_VERSION }}
           body: Abre este enlace desde el celular, descarga el APK e instálalo encima de la versión anterior.
           files: dist/*.apk
           make_latest: true

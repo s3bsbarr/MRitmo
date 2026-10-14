@@ -1,5 +1,5 @@
 /**
- * Ritmo's account emails, in Spanish and in the app's style: white page,
+ * MRitmo's account emails, in Spanish and in the app's style: white page,
  * black ink, one pill button, and the 6-digit code for when the link opens
  * in the wrong place. The "Servidor" workflow uploads these to Supabase Auth.
  *
@@ -26,7 +26,7 @@ function layout({ preheader, title, intro, button, codeLabel = 'O escribe este c
     <td align="center" style="padding:48px 24px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;font-family:${FONT};color:#0A0A0B;">
         <tr>
-          <td style="font-size:15px;font-weight:600;letter-spacing:-0.1px;padding-bottom:40px;">Ritmo</td>
+          <td style="font-size:15px;font-weight:600;letter-spacing:-0.1px;padding-bottom:40px;">MRitmo</td>
         </tr>
         <tr>
           <td style="font-size:30px;line-height:36px;font-weight:700;letter-spacing:-0.9px;padding-bottom:12px;">${title}</td>
@@ -61,11 +61,11 @@ function layout({ preheader, title, intro, button, codeLabel = 'O escribe este c
 }
 
 const IGNORE = 'Si no fuiste tú, ignora este correo: nada cambia en tu cuenta.';
-const OPEN_ON_PHONE = 'Abre el enlace desde el teléfono donde tienes Ritmo. Vence en 1 hora.';
+const OPEN_ON_PHONE = 'Abre el enlace desde el teléfono donde tienes MRitmo. Vence en 1 hora.';
 
 export const emails = {
   confirmation: {
-    subject: 'Activa tu cuenta de Ritmo',
+    subject: 'Activa tu cuenta de MRitmo',
     content: layout({
       preheader: 'Un toque y tu cuenta queda lista.',
       title: 'Activa tu cuenta',
@@ -75,17 +75,17 @@ export const emails = {
     }),
   },
   magic_link: {
-    subject: 'Entra a Ritmo',
+    subject: 'Entra a MRitmo',
     content: layout({
       preheader: 'Tu enlace para entrar sin contraseña.',
       title: 'Entra sin contraseña',
       intro: 'Toca el botón y entras directo a tu cuenta.',
-      button: 'Entrar a Ritmo',
+      button: 'Entrar a MRitmo',
       note: `${OPEN_ON_PHONE} ${IGNORE}`,
     }),
   },
   recovery: {
-    subject: 'Cambia tu contraseña de Ritmo',
+    subject: 'Cambia tu contraseña de MRitmo',
     content: layout({
       preheader: 'Elige una contraseña nueva.',
       title: 'Cambia tu contraseña',
@@ -95,27 +95,27 @@ export const emails = {
     }),
   },
   email_change: {
-    subject: 'Confirma tu nuevo correo en Ritmo',
+    subject: 'Confirma tu nuevo correo en MRitmo',
     content: layout({
       preheader: 'Confirma el cambio de correo.',
       title: 'Confirma tu nuevo correo',
-      intro: 'Pediste usar {{ .NewEmail }} en tu cuenta de Ritmo. Confírmalo para terminar el cambio.',
+      intro: 'Pediste usar {{ .NewEmail }} en tu cuenta de MRitmo. Confírmalo para terminar el cambio.',
       button: 'Confirmar correo',
       note: IGNORE,
     }),
   },
   invite: {
-    subject: 'Te invitaron a Ritmo',
+    subject: 'Te invitaron a MRitmo',
     content: layout({
-      preheader: 'Crea tu cuenta de Ritmo.',
-      title: 'Te invitaron a Ritmo',
-      intro: 'Ritmo mide tu día en tiempo, no en número de tareas. Acepta la invitación para crear tu cuenta.',
+      preheader: 'Crea tu cuenta de MRitmo.',
+      title: 'Te invitaron a MRitmo',
+      intro: 'MRitmo mide tu día en tiempo, no en número de tareas. Acepta la invitación para crear tu cuenta.',
       button: 'Aceptar invitación',
       note: IGNORE,
     }),
   },
   reauthentication: {
-    subject: 'Tu código de Ritmo',
+    subject: 'Tu código de MRitmo',
     content: layout({
       preheader: 'Confirma que eres tú.',
       title: 'Confirma que eres tú',

@@ -1,7 +1,7 @@
 /**
  * Server push (friends now; shared habits in 1.7). This phone's Expo push
  * token is stored under your account; the server sends through Expo when
- * something happens (a request, an acceptance…) even if Ritmo is closed.
+ * something happens (a request, an acceptance…) even if MRitmo is closed.
  *
  * Needs, at build time: google-services.json (Firebase) and the Expo project
  * id (extra.eas.projectId). Without them the app works as before and Settings

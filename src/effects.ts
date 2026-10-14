@@ -1,5 +1,5 @@
 /**
- * Everything Ritmo shows outside the app: the live focus notification, every
+ * Everything MRitmo shows outside the app: the live focus notification, every
  * scheduled notification, and home-screen widgets. Safe on web and in headless JS.
  *
  * Scheduling is a rolling 7-day plan rebuilt from scratch on every change, so a

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Ritmo",
-    "slug": "ritmo",
+    "name": "MRitmo",
+    "slug": "mritmo",
     "version": "1.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -74,7 +74,7 @@
           "widgets": [
             {
               "name": "RitmoEstado",
-              "label": "Ritmo · Estado",
+              "label": "MRitmo · Estado",
               "description": "Tu personaje y el avance del día",
               "minWidth": "57dp",
               "minHeight": "57dp",
@@ -85,7 +85,7 @@
             },
             {
               "name": "RitmoFoco",
-              "label": "Ritmo · Foco",
+              "label": "MRitmo · Foco",
               "description": "Inicia tu próxima tarea o controla el temporizador",
               "minWidth": "250dp",
               "minHeight": "57dp",

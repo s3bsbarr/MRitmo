@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Ritmo's server, driven from GitHub Actions with a single secret
+ * MRitmo's server, driven from GitHub Actions with a single secret
  * (SUPABASE_ACCESS_TOKEN, a personal access token of the Supabase account).
  *
  *   node supabase/scripts/server.mjs migrate          apply new files in supabase/migrations
@@ -20,7 +20,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const REF = process.env.SUPABASE_PROJECT_REF || 'qehkinjwkpfmmmyxqjxm';
 const API = `https://api.supabase.com/v1/projects/${REF}`;
 const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
-const BOT_EMAIL = 'amigo.bot@ritmo.app';
+const BOT_EMAIL = 'amigo.bot@mritmo.com';
 
 function summary(line) {
   console.log(line);
@@ -105,7 +105,7 @@ async function auth() {
       smtp_user: user,
       smtp_pass: pass.replace(/\s+/g, ''),
       smtp_admin_email: process.env.SMTP_FROM || user,
-      smtp_sender_name: process.env.SMTP_SENDER_NAME || 'Ritmo',
+      smtp_sender_name: process.env.SMTP_SENDER_NAME || 'MRitmo',
       smtp_max_frequency: 30,
     });
     // Custom SMTP starts at a low hourly cap; Gmail allows ~500 a day.
@@ -156,7 +156,7 @@ async function bot(action, rawUser) {
   switch (action) {
     case 'preparar': {
       const u = String(rawUser ?? '').trim().replace(/^@/, '').toLowerCase();
-      if (!/^[a-z0-9_.]{3,20}$/.test(u)) throw new Error('Escribe tu @usuario de Ritmo en el campo "usuario".');
+      if (!/^[a-z0-9_.]{3,20}$/.test(u)) throw new Error('Escribe tu @usuario de MRitmo en el campo "usuario".');
       const id = await ensureBotUser();
       summary(`- ${await one(`select public.ritmo_bot_setup(${lit(id)}, ${lit(u)})`)}`);
       summary(`- ${await one('select public.ritmo_bot_request()')}`);

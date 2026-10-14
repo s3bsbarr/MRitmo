@@ -105,7 +105,7 @@ export type EmailCodeKind = 'signup' | 'link' | 'recovery';
 
 /**
  * The 6-digit code from any account email. Same result as tapping the link,
- * for when the link opens in a browser instead of in Ritmo.
+ * for when the link opens in a browser instead of in MRitmo.
  */
 export async function verifyEmailCode(email: string, code: string, kind: EmailCodeKind) {
   const type = kind === 'recovery' ? 'recovery' : kind === 'signup' ? 'signup' : 'email';

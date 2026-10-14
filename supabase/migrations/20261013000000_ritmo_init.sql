@@ -1,4 +1,4 @@
--- Ritmo · respaldo de la cuenta.
+-- MRitmo · respaldo de la cuenta.
 -- Una fila por usuario con todo su estado (tareas, hábitos y ajustes).
 -- Solo el dueño puede leerla o escribirla (Row Level Security).
 

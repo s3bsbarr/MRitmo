@@ -156,7 +156,7 @@ function LiveSection() {
           style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md }}
         >
           <Ionicons name="radio-outline" size={20} color={c.text} />
-          <Text style={[type.body, { color: c.text, flex: 1 }]}>Ajustes de Live Updates de Ritmo</Text>
+          <Text style={[type.body, { color: c.text, flex: 1 }]}>Ajustes de Live Updates de MRitmo</Text>
           <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
         </Press>
       </View>
@@ -456,7 +456,7 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
         {Platform.OS === 'android' && (
           <Section title="Widgets">
             <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, gap: space.md }}>
-              <Text style={[type.body, { color: c.text }]}>Mantén presionado un espacio vacío de tu pantalla de inicio, toca Widgets y busca Ritmo.</Text>
+              <Text style={[type.body, { color: c.text }]}>Mantén presionado un espacio vacío de tu pantalla de inicio, toca Widgets y busca MRitmo.</Text>
               <Text style={[type.footnote, { color: c.textSecondary }]}>
                 Estado: tu personaje y el avance del día. Pequeño muestra solo al personaje; ancho añade el porcentaje.{'\n'}
                 Foco: inicia tu próxima tarea, pausa o márcala como hecha sin abrir la app.
@@ -465,7 +465,7 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
           </Section>
         )}
 
-        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>Ritmo {Constants.expoConfig?.version ?? ''}</Text>
+        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>MRitmo {Constants.expoConfig?.version ?? ''}</Text>
       </ScrollView>
     </View>
   );

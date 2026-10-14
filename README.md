@@ -1,4 +1,4 @@
-# Ritmo
+# MRitmo
 
 App de productividad para Android: planeas el día por tiempo, no por número de tareas.
 
@@ -17,12 +17,12 @@ Diseño monocromo: blanco en modo claro, negro en modo oscuro, tipografía Inter
 Cada `push` a `main` compila el APK con GitHub Actions y lo publica en **Releases**.
 
 1. En el celular, abre la pestaña **Releases** de este repositorio.
-2. Descarga `Ritmo-N.apk` de la versión más reciente.
+2. Descarga `MRitmo-N.apk` de la versión más reciente.
 3. Ábrelo y permite "Instalar apps desconocidas" para tu navegador cuando Android lo pida.
 
 ## Firma propia
 
-Si existen los secretos `RITMO_KEYSTORE_B64` y `RITMO_KEYSTORE_PASSWORD` en *Settings → Secrets and variables → Actions*, el APK se firma con la llave de Ritmo; si no, con la de pruebas.
+Si existen los secretos `RITMO_KEYSTORE_B64` y `RITMO_KEYSTORE_PASSWORD` en *Settings → Secrets and variables → Actions*, el APK se firma con la llave de MRitmo; si no, con la de pruebas.
 
 ## Cuentas, amigos y servidor
 

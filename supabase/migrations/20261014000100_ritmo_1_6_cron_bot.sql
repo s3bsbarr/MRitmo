@@ -1,4 +1,4 @@
--- Ritmo 1.6 · Tareas programadas del servidor y "amigo bot".
+-- MRitmo 1.6 · Tareas programadas del servidor y "amigo bot".
 --
 -- 1. Barrido de push: cada minuto reintenta eventos que no se enviaron (por
 --    ejemplo, si la Edge Function tardó en despertar).

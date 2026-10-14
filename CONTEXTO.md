@@ -1,11 +1,13 @@
-# Ritmo — contexto del proyecto
+# MRitmo — contexto del proyecto
 
 > Documento vivo. Se actualiza con cada versión. Última versión descrita: **1.6** (13 oct 2026).
 > Repositorio: github.com/s3bsbarr/MRitmo · Descargas: pestaña Releases (v1.2, v1.3, v1.4…).
 
-## 1. Qué es Ritmo
+## 1. Qué es MRitmo
 
-Ritmo es una app de productividad para Android que mide el día **en tiempo, no en número de tareas**. Cada tarea lleva su duración y el avance del día es la parte del tiempo planeado que ya se cumplió: una tarea de 2 h pesa ocho veces más que una de 15 min.
+**Nombre:** MRitmo ("My Ritmo"). Se adoptó en la 1.6 porque ritmo.com está ocupado y mritmo.com está libre (dominio planeado para noviembre 2026). Todo lo visible dice MRitmo: nombre de la app, widgets, correos, textos para compartir, APK (`MRitmo-X.Y.apk`). Por dentro se conservan a propósito los identificadores que no ve nadie y cuyo cambio rompería algo: paquete Android `com.sebas.ritmo` (cambiarlo obliga a desinstalar, y Firebase ya está registrado con él), esquema de enlaces `ritmo://` (redirecciones de Supabase y enlaces ya enviados), claves de almacenamiento `ritmo.*` (se perderían los datos del teléfono), nombres de tablas y del módulo nativo. El slug de Expo es `mritmo`.
+
+MRitmo es una app de productividad para Android que mide el día **en tiempo, no en número de tareas**. Cada tarea lleva su duración y el avance del día es la parte del tiempo planeado que ya se cumplió: una tarea de 2 h pesa ocho veces más que una de 15 min.
 
 - **Inspiración:** Outdo (outdo.one): tareas con duración, progreso ponderado por tiempo y salas con ranking en vivo entre amigos.
 - **Dueño y único usuario por ahora:** Sebas (Bogotá). La prueba en un Samsung Galaxy S24, Android 16, One UI 8.5.
@@ -78,7 +80,7 @@ Ritmo es una app de productividad para Android que mide el día **en tiempo, no 
 
 **Cuenta y respaldo**
 - Supabase (correo + contraseña, o "Entrar sin contraseña" con enlace al correo). Respaldo automático unos segundos después de cada cambio y al volver a la app.
-- **Correos propios (1.6):** Gmail de la app como SMTP, plantillas en español con el estilo de Ritmo. Cada correo trae enlace **y código de 6 dígitos**: si el enlace se abre en el navegador en vez de en Ritmo, se escribe el código en la app.
+- **Correos propios (1.6):** Gmail de la app como SMTP, plantillas en español con el estilo de MRitmo. Cada correo trae enlace **y código de 6 dígitos**: si el enlace se abre en el navegador en vez de en MRitmo, se escribe el código en la app.
 - **Olvidé mi contraseña (1.6):** correo → enlace o código → pantalla "Nueva contraseña" dentro de la app.
 - Al reinstalar e iniciar sesión vuelve todo: tareas, hábitos, rachas, nombre, personaje, tema.
 - Fusión segura entre teléfono y nube: gana el cambio más reciente, se conserva lo creado sin conexión, lo borrado no reaparece.
@@ -97,7 +99,7 @@ Ritmo es una app de productividad para Android que mide el día **en tiempo, no 
   - **Cómo viaja una push:** evento en la base → trigger escribe en `push_events` (con freno anti-spam `push_enqueue`) → otro trigger llama por pg_net a la Edge Function `push` → la función reclama el evento (`push_claim`, atómico, máx. 3 intentos), arma el texto en español, envía a Expo Push y lo cierra (`push_finish`, borra tokens muertos). pg_cron barre cada minuto lo que no salió. **Para la 1.7:** nuevo tipo = un `push_enqueue(...)` en un trigger + una entrada en `MESSAGES` de `supabase/functions/push/index.ts` (+ clave de preferencia `habits`).
 - **Servidor como código:** `supabase/scripts/server.mjs` (API de gestión de Supabase con un solo token): `migrate` (aplica migraciones nuevas, registro en `ritmo_admin.migrations`, cada archivo en una transacción), `auth` (plantillas `supabase/templates/emails.mjs`, SMTP desde secretos, OTP de 6 dígitos, redirección `ritmo://auth`), `bot`.
 - **Compilación y despliegue (GitHub Actions):**
-  - `build-apk.yml`: `expo prebuild` → Gradle → firma con la llave de Ritmo → Release `vX.Y` con `Ritmo-X.Y.apk`. Escribe `google-services.json` desde el secreto y pasa `EXPO_PROJECT_ID`. No corre si solo cambian docs o `supabase/`.
+  - `build-apk.yml`: `expo prebuild` → Gradle → firma con la llave de MRitmo → Release `vX.Y` con `MRitmo-X.Y.apk`. Escribe `google-services.json` desde el secreto y pasa `EXPO_PROJECT_ID`. No corre si solo cambian docs o `supabase/`.
   - `server.yml` ("Servidor (Supabase)"): migraciones + correos + Edge Functions, solo cuando cambia `supabase/`.
   - `bot.yml` ("Amigo bot"): acciones manuales del bot.
 - **Amigo bot:** `@amigobot` ("Amigo Bot", mujer). pg_cron mueve su avance cada minuto (7:00–21:00 Bogotá), foco los primeros 25 min de cada hora, acepta solo las solicitudes. Acciones: preparar · solicitud · avanzar · completar · quitar · estado.
@@ -161,7 +163,7 @@ Notas de diseño para las siguientes versiones:
 
 Cuando un chat de construcción se llena, se abre uno nuevo dentro del proyecto RITMO con este mensaje:
 
-> Sigamos construyendo Ritmo. El contexto está en CONTEXTO.md y el código en github.com/s3bsbarr/MRitmo (rama main). Clona el repo, lee CONTEXTO.md y AGENTS.md, y continúa desde la versión X.Y con estas notas: …
+> Sigamos construyendo MRitmo. El contexto está en CONTEXTO.md y el código en github.com/s3bsbarr/MRitmo (rama main). Clona el repo, lee CONTEXTO.md y AGENTS.md, y continúa desde la versión X.Y con estas notas: …
 
 Datos que el chat nuevo necesita y ya están en el repo: flujo de compilación (`.github/workflows/build-apk.yml`), versión en `app.json` (`expo.version`), migraciones en `supabase/migrations/` (se aplican solas con `server.yml` al hacer push), Edge Functions en `supabase/functions/`, plantillas de correo en `supabase/templates/`, URL y llave publishable de Supabase en `src/sync.ts`, configuración del servidor en `docs/SERVIDOR.md`. La llave de firma y los demás secretos están en GitHub; nunca van al repositorio.
 

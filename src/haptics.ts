@@ -1,5 +1,5 @@
 /**
- * Ritmo's haptics. Same API as expo-haptics, but on Android it uses the
+ * MRitmo's haptics. Same API as expo-haptics, but on Android it uses the
  * system's own haptic constants (View.performHapticFeedback). On Samsung
  * those are the crisp, tuned clicks of One UI; the generic vibrator calls
  * feel soft and are easy to miss.

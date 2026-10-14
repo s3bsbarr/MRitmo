@@ -21,7 +21,7 @@ on:
         default: estado
         options: [preparar, solicitud, avanzar, completar, quitar, estado]
       usuario:
-        description: Tu @usuario de Ritmo (solo para "preparar")
+        description: Tu @usuario de MRitmo (solo para "preparar")
         type: string
         required: false
 

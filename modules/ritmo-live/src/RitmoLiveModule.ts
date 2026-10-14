@@ -3,7 +3,7 @@ import { NativeModule, requireOptionalNativeModule } from 'expo';
 export type LiveDiagnosis = {
   sdk: number;
   manufacturer: string;
-  /** User/system allows Live Updates for Ritmo (Android 16+); null below 16. */
+  /** User/system allows Live Updates for MRitmo (Android 16+); null below 16. */
   canPost: boolean | null;
   /** The last timer notification met every Live Update requirement. */
   promotable: boolean | null;

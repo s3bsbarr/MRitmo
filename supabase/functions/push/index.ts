@@ -1,5 +1,5 @@
 /**
- * Ritmo · push
+ * MRitmo · push
  *
  * Receives {"id": <push_events.id>} from the database (pg_net), claims the
  * event, writes the message in Spanish and sends it through Expo Push.

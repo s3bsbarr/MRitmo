@@ -15,7 +15,7 @@ const EMAIL_RE = /\S+@\S+\.\S+/;
 /**
  * Create an account or sign in. Every email (activation, sign-in link, password
  * reset) carries a link and a 6-digit code: the code works even when the link
- * opens in a browser instead of Ritmo. On success the caller restores and backs up data.
+ * opens in a browser instead of MRitmo. On success the caller restores and backs up data.
  */
 export function AuthSheet({
   visible,

@@ -1,4 +1,4 @@
--- Ritmo 1.6 · Notificaciones push desde el servidor y cierre de amistades.
+-- MRitmo 1.6 · Notificaciones push desde el servidor y cierre de amistades.
 --
 -- Cómo viaja una notificación:
 --   1. Algo pasa en la base (p. ej. una solicitud de amistad).

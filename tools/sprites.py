@@ -1,4 +1,4 @@
-"""Pixel-art avatar generator for Ritmo.
+"""Pixel-art avatar generator for MRitmo.
 
 Frames are symmetric: each is authored as a 12-column left half and mirrored to
 24 columns. Faces are applied as mood overrides on fixed head rows.

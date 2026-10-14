@@ -17,7 +17,7 @@ const STAGES: { mood: Mood; pct: string; text: string }[] = [
   { mood: 'fuerza', pct: '100 %', text: 'Celebra' },
 ];
 
-/** First launch: how Ritmo measures a day, your name, your character. */
+/** First launch: how MRitmo measures a day, your name, your character. */
 export function Welcome({ initial, onDone, onSignIn }: { initial: Settings; onDone: (patch: Partial<Settings>) => void; onSignIn: () => void }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
