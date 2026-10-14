@@ -71,4 +71,7 @@ Se maneja desde **Actions → Amigo bot → Run workflow** (app de GitHub o gith
 | `habito` | Te invita a un hábito juntos (escribe el título en el campo "usuario"; vacío = "Leer 20 minutos"). Prueba la invitación con el botón Aceptar. |
 | `marcar` | Marca hoy sus hábitos juntos. Si tú no has marcado: "Amigo Bot ya marcó…, faltas tú" con el botón Hecho. Se puede repetir. |
 | `sala` | Crea una sala y te invita (nombre en el campo "usuario"; vacío = "Sala de prueba"). Prueba la invitación con el botón Unirme; la sala aparece en Amigos → Salas. |
+| `ocultar` | (1.9) Oculta su avance, o lo vuelve a mostrar. En tu ranking sale al final con "Avance oculto"; su hoja dice "Avance oculto". |
+| `bloquear` | (1.9) Te bloquea, o te desbloquea. Bloqueada: desaparece de tu ranking, tus salas y la búsqueda de @amigobot, y se borran sus hábitos juntos. Al desbloquear, usa `solicitud` para volver a ser amigos. |
+| `borrar` | (1.9) Elimina su cuenta igual que "Eliminar cuenta" en la app: desaparece de tu ranking, sus salas pasan al miembro más antiguo (tú) o se borran si estaba sola. `preparar` la vuelve a crear. |
 | `estado` | Sus últimos días, sus hábitos juntos y las últimas notificaciones enviadas con su resultado (`ok 1/1`, `no devices`, `muted`…). |
