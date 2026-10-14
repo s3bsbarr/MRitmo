@@ -3,6 +3,8 @@ import { NativeModule, requireOptionalNativeModule } from 'expo';
 export type LiveDiagnosis = {
   sdk: number;
   manufacturer: string;
+  /** Template of the last timer: metric (Android 17, big countdown), progress (Android 16), standard or none. */
+  style?: 'metric' | 'progress' | 'standard' | 'none';
   /** User/system allows Live Updates for MRitmo (Android 16+); null below 16. */
   canPost: boolean | null;
   /** The last timer notification met every Live Update requirement. */
@@ -19,6 +21,10 @@ declare class RitmoLiveModule extends NativeModule<{}> {
   stop(): void;
   diagnose(): LiveDiagnosis;
   openPromotionSettings(): void;
+  /** Opens the email app's inbox. Throws when the phone has none. */
+  openEmailApp(): void;
+  /** Keeps the screen on (full-screen timer). */
+  keepScreenOn(on: boolean): void;
 }
 
 /** Null on web and in Expo Go, where the native code is not compiled in. */

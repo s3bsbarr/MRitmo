@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { dayKey, Habit, loadHabits, loadTasks, progressOf, rememberDeleted, saveHabits, saveTasks, shiftDay, Task, tasksForDay, uid, upcomingTasks } from './data';
 
+import {
+  acceptShared,
+  activeShared,
+  fetchShared,
+  inviteShared,
+  loadSharedCache,
+  removeShared,
+  setSharedMark,
+  SharedHabit,
+  subscribeShared,
+} from './shared';
+
 export { dayKey, progressOf, shiftDay };
 export type { Habit, Task };
 
@@ -154,3 +166,68 @@ export function useHabits() {
 }
 
 export type HabitsApi = ReturnType<typeof useHabits>;
+
+/**
+ * Shared habits (1.7): the cache first, then the server, then live changes.
+ * `signedIn` turns the server part on; signed out, the list is empty.
+ */
+export function useShared(signedIn: boolean) {
+  const [habits, setHabits] = useState<SharedHabit[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    try {
+      const c = await fetchShared();
+      setHabits(c.habits);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Signed out (or the session not restored yet): nothing on screen. The cache
+    // stays until sign-out clears it, so a slow start doesn't wipe offline data.
+    if (!signedIn) {
+      setHabits([]);
+      return;
+    }
+    // Show what the phone knows right away; the server catches up.
+    loadSharedCache().then((c) => setHabits((prev) => (prev.length ? prev : c.habits)));
+    reload();
+    return subscribeShared(reload);
+  }, [signedIn, reload]);
+
+  const toggleToday = useCallback(async (id: string) => {
+    const today = dayKey();
+    const h = (await loadSharedCache()).habits.find((x) => x.id === id);
+    const checked = !(h?.myChecks.includes(today) ?? false);
+    // Instant on screen; the write follows.
+    setHabits((prev) =>
+      prev.map((x) => (x.id !== id ? x : { ...x, myChecks: checked ? [...x.myChecks.filter((d) => d !== today), today] : x.myChecks.filter((d) => d !== today) })),
+    );
+    const c = await setSharedMark(id, checked, today);
+    setHabits(c.habits);
+  }, []);
+
+  const run = useCallback(
+    async (fn: () => Promise<void>) => {
+      await fn();
+      await reload();
+    },
+    [reload],
+  );
+
+  return {
+    habits,
+    active: useMemo(() => activeShared(habits), [habits]),
+    error,
+    reload,
+    toggleToday,
+    invite: (friendId: string, title: string) => run(() => inviteShared(friendId, title)),
+    accept: (id: string) => run(() => acceptShared(id)),
+    remove: (id: string) => run(() => removeShared(id)),
+  };
+}
+
+export type SharedApi = ReturnType<typeof useShared>;

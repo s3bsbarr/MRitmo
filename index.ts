@@ -20,7 +20,7 @@ if (Platform.OS !== 'web') {
       const response = data as unknown as Notifications.NotificationResponse;
       const action = response.actionIdentifier;
       if (action && action !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
-        const payload = (response.notification?.request?.content?.data ?? {}) as { taskId?: string; habitId?: string };
+        const payload = (response.notification?.request?.content?.data ?? {}) as { taskId?: string; habitId?: string; sharedId?: string };
         await applyAction(action, payload, { immediate: true });
         await Notifications.dismissNotificationAsync(response.notification.request.identifier).catch(() => {});
       }

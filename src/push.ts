@@ -1,5 +1,5 @@
 /**
- * Server push (friends now; shared habits in 1.7). This phone's Expo push
+ * Server push: friends (1.6) and shared habits (1.7). This phone's Expo push
  * token is stored under your account; the server sends through Expo when
  * something happens (a request, an acceptance…) even if MRitmo is closed.
  *
@@ -79,7 +79,7 @@ export async function unregisterPush() {
 }
 
 /** Tell the server which kinds you want. Keys: friends (1.6), habits (1.7). */
-export async function savePushPrefs(prefs: { friends: boolean }) {
+export async function savePushPrefs(prefs: { friends: boolean; habits: boolean }) {
   const session = await getSession();
   if (!session) return;
   await supabase
@@ -87,10 +87,10 @@ export async function savePushPrefs(prefs: { friends: boolean }) {
     .upsert({ user_id: session.user.id, prefs, updated_at: new Date().toISOString() });
 }
 
-export function pushStatusLabel(s: PushStatus): string {
+export function pushStatusLabel(s: PushStatus, kind: 'friends' | 'habits' = 'friends'): string {
   switch (s.state) {
     case 'ready':
-      return 'Solicitudes y quién te acepta, con la app cerrada';
+      return kind === 'habits' ? 'Invitaciones y "ya marcó, faltas tú", con la app cerrada' : 'Solicitudes y quién te acepta, con la app cerrada';
     case 'checking':
       return 'Conectando este teléfono…';
     case 'signed-out':

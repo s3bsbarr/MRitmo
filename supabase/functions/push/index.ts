@@ -7,7 +7,8 @@
  * database decides whether that id still needs sending (claim is atomic and
  * an event is sent at most once), so calling it from outside does nothing.
  *
- * Adding a new kind (1.7: habit_invite, habit_nudge…) = one entry in MESSAGES.
+ * Adding a new kind = one entry in MESSAGES (+ its push_enqueue in a trigger).
+ * 1.7: habit_invite, habit_accepted, habit_nudge (preference "habits").
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -21,7 +22,20 @@ type Claim = {
   prefs: Record<string, unknown>;
 };
 
-type Message = { pref: string; title: string; body: string; url: string; channelId: string };
+type Message = {
+  pref: string;
+  title: string;
+  body: string;
+  url: string;
+  channelId: string;
+  /** Buttons registered in the app (src/effects.ts, CAT). They act with the app closed. */
+  categoryId?: string;
+};
+
+const quoted = (c: Claim) => {
+  const t = typeof c.payload?.title === 'string' ? c.payload.title : '';
+  return t ? `«${t}»` : 'su hábito';
+};
 
 const MESSAGES: Record<string, (c: Claim) => Message> = {
   friend_request: (c) => ({
@@ -37,6 +51,29 @@ const MESSAGES: Record<string, (c: Claim) => Message> = {
     body: 'Ya pueden ver el avance del día del otro.',
     url: c.actor_id ? `ritmo://amigos/${c.actor_id}` : 'ritmo://amigos',
     channelId: 'ritmo_friends',
+  }),
+  habit_invite: (c) => ({
+    pref: 'habits',
+    title: `${c.actor_name} te invitó a un hábito`,
+    body: `${quoted(c)}. La racha solo avanza el día que los dos lo marcan.`,
+    url: c.actor_id ? `ritmo://amigos/${c.actor_id}` : 'ritmo://amigos',
+    channelId: 'ritmo_friends',
+    categoryId: 'ritmo_shared_invite',
+  }),
+  habit_accepted: (c) => ({
+    pref: 'habits',
+    title: `${c.actor_name} aceptó ${quoted(c)}`,
+    body: 'Ya está en el Hoy de los dos. La racha empieza cuando ambos lo marquen.',
+    url: 'ritmo://hoy',
+    channelId: 'ritmo_friends',
+  }),
+  habit_nudge: (c) => ({
+    pref: 'habits',
+    title: `${c.actor_name} ya marcó ${quoted(c)}`,
+    body: 'Faltas tú para que la racha avance hoy.',
+    url: 'ritmo://hoy',
+    channelId: 'ritmo_friends',
+    categoryId: 'ritmo_shared_nudge',
   }),
 };
 
@@ -97,8 +134,9 @@ Deno.serve(async (req) => {
     to,
     title: msg.title,
     body: msg.body,
-    data: { url: msg.url, kind: claim.kind },
+    data: { url: msg.url, kind: claim.kind, ...(typeof claim.payload?.habit_id === 'string' ? { sharedId: claim.payload.habit_id } : {}) },
     channelId: msg.channelId,
+    ...(msg.categoryId ? { categoryId: msg.categoryId } : {}),
     priority: 'high',
     ttl: 60 * 60 * 24,
   }));

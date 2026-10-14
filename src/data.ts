@@ -61,6 +61,8 @@ export type Settings = {
   remindOverdue: boolean;
   /** Server push about friends: requests and acceptances. */
   remindFriends: boolean;
+  /** Server push about shared habits: invitations, acceptances, "ya marcó, faltas tú". */
+  remindShared: boolean;
 };
 
 export const emptyFocus: FocusState = { taskId: null, endsAt: null, remaining: 0 };
@@ -81,6 +83,7 @@ export const defaultSettings: Settings = {
   taskLead: 10,
   remindOverdue: true,
   remindFriends: true,
+  remindShared: true,
 };
 
 const TASKS_KEY = 'ritmo.tasks.v1';

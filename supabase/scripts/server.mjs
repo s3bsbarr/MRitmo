@@ -6,7 +6,7 @@
  *   node supabase/scripts/server.mjs migrate          apply new files in supabase/migrations
  *   node supabase/scripts/server.mjs auth             emails (templates + SMTP), redirect URLs, OTP
  *   node supabase/scripts/server.mjs bot <action> [@usuario]
- *        actions: preparar · solicitud · avanzar · completar · quitar · estado
+ *        actions: preparar · solicitud · avanzar · completar · quitar · habito · marcar · estado
  *
  * Everything goes through the Supabase Management API, so no database
  * password, Docker or local install is needed.
@@ -127,6 +127,16 @@ async function auth() {
       : '- Plantillas pendientes: Supabase solo las permite con SMTP propio. Se suben solas cuando agregues SMTP_USER y SMTP_PASS.',
   );
   summary(`- Redirecciones permitidas: ${patch.uri_allow_list}`);
+
+  // The app reads this flag to decide whether "Revisa tu correo" asks for the 6-digit code.
+  // Supabase's default mailer sends only the link; our templates (own SMTP) add the code.
+  try {
+    await sql(`insert into public.app_flags (key, value, updated_at) values ('email_code', '${hasSmtp ? 'true' : 'false'}'::jsonb, now())
+               on conflict (key) do update set value = excluded.value, updated_at = now()`);
+    summary(hasSmtp ? '- App: los correos traen código, la app lo pide.' : '- App: los correos traen solo el enlace, la app no pide código.');
+  } catch (e) {
+    summary(`- App: no se pudo guardar la bandera del código (${e.message}). ¿Faltan las migraciones de la 1.7?`);
+  }
 }
 
 /* ─── bot ─────────────────────────────────────────────────────────────── */
@@ -184,6 +194,14 @@ async function bot(action, rawUser) {
     case 'quitar':
       summary(`- ${await one('select public.ritmo_bot_remove()')}`);
       break;
+    case 'habito': {
+      const title = String(rawUser ?? '').trim();
+      summary(`- ${await one(title ? `select public.ritmo_bot_invite(${lit(title)})` : 'select public.ritmo_bot_invite()')}`);
+      break;
+    }
+    case 'marcar':
+      summary(`- ${await one('select public.ritmo_bot_check()')}`);
+      break;
     case 'estado': {
       const rows = await sql(`
         select p.day, p.done_minutes, p.total_minutes, p.focus_until > now() as en_foco
@@ -193,7 +211,15 @@ async function bot(action, rawUser) {
       for (const r of rows ?? []) {
         summary(`| ${r.day} | ${r.done_minutes} de ${r.total_minutes} | ${Math.round((100 * r.done_minutes) / Math.max(1, r.total_minutes))} % | ${r.en_foco ? 'sí' : ''} |`);
       }
-      const ev = await sql(`select kind, created_at, result from public.push_events order by id desc limit 5`);
+      const hab = await sql(`
+        select h.title, h.status, exists (select 1 from public.shared_habit_checks c where c.habit_id = h.id and c.user_id = b.id and c.day = public.ritmo_bot_today()) as marco
+          from public.shared_habits h join public.ritmo_bot b on b.id in (h.created_by, h.partner)
+         order by h.created_at`).catch(() => []);
+      if (hab?.length) {
+        summary('\n**Hábitos juntos**\n\n| Hábito | Estado | Marcó hoy |\n|---|---|---|');
+        for (const r of hab) summary(`| ${r.title} | ${r.status === 'active' ? 'activo' : 'invitación'} | ${r.marco ? 'sí' : ''} |`);
+      }
+      const ev = await sql(`select kind, created_at, result from public.push_events order by id desc limit 8`);
       summary('\n**Últimas notificaciones**\n\n| Tipo | Cuándo (UTC) | Resultado |\n|---|---|---|');
       for (const r of ev ?? []) summary(`| ${r.kind} | ${String(r.created_at).slice(0, 19)} | ${r.result ?? 'pendiente'} |`);
       break;

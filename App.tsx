@@ -24,7 +24,8 @@ import { AccountInfo, SettingsScreen } from './src/screens/Settings';
 import { Summary } from './src/screens/Summary';
 import { Today } from './src/screens/Today';
 import { Welcome } from './src/screens/Welcome';
-import { useHabits, useTasks } from './src/store';
+import { clearSharedCache } from './src/shared';
+import { useHabits, useShared, useTasks } from './src/store';
 import { getSession, handleAuthUrl, scheduleSync, signOut, supabase, syncNow } from './src/sync';
 import { palettes, ThemeContext } from './src/theme';
 
@@ -52,9 +53,11 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [push, setPush] = useState<PushStatus>({ state: 'checking' });
   const [openFriendId, setOpenFriendId] = useState<string | null>(null);
+  const [focusFull, setFocusFull] = useState(false);
+  const sharedApi = useShared(Boolean(account.email));
 
-  const snapRef = useRef({ tasks: api.tasks, habits: habitsApi.habits, focus, settings });
-  snapRef.current = { tasks: api.tasks, habits: habitsApi.habits, focus, settings };
+  const snapRef = useRef({ tasks: api.tasks, habits: habitsApi.habits, focus, settings, shared: sharedApi.active });
+  snapRef.current = { tasks: api.tasks, habits: habitsApi.habits, focus, settings, shared: sharedApi.active };
 
   useEffect(() => {
     Promise.all([loadSettings(), loadFocus()]).then(([s, f]) => {
@@ -72,7 +75,7 @@ export default function App() {
     if (!ready) return;
     const id = setTimeout(() => resyncAll(snapRef.current), 450);
     return () => clearTimeout(id);
-  }, [ready, api.tasks, habitsApi.habits, focus, settings]);
+  }, [ready, api.tasks, habitsApi.habits, focus, settings, sharedApi.active]);
 
   const setFocus = useCallback((f: FocusState) => {
     setFocusState(f);
@@ -158,8 +161,8 @@ export default function App() {
 
   useEffect(() => {
     if (!ready || !account.email) return;
-    savePushPrefs({ friends: settings.remindFriends }).catch(() => {});
-  }, [ready, account.email, settings.remindFriends]);
+    savePushPrefs({ friends: settings.remindFriends, habits: settings.remindShared }).catch(() => {});
+  }, [ready, account.email, settings.remindFriends, settings.remindShared]);
 
   useEffect(() => {
     if (!ready || !account.email) return;
@@ -198,7 +201,14 @@ export default function App() {
       handleAuthUrl(url).then((r) => {
         if (!r) return;
         if (r.ok) runSync();
-        if (r.ok && !r.recovery) return;
+        if (r.ok && !r.recovery) {
+          // Activation or sign-in link: you're in. Close "Revisa tu correo" if it was open.
+          setAuthMode(null);
+          setAuthStep('form');
+          setAuthError(null);
+          requestNotificationPermission();
+          return;
+        }
         setShowSettings(false);
         setAuthStep(r.ok ? 'newPassword' : 'form');
         setAuthError(r.ok ? null : r.message);
@@ -208,7 +218,12 @@ export default function App() {
     }
     const [path, param] = url.replace(/^ritmo:\/\//, '').split(/[?#]/)[0].split('/');
     setShowSettings(false);
-    if (path === 'foco') setTab('foco');
+    setFocusFull(false);
+    if (path === 'foco') {
+      setTab('foco');
+      // ritmo://foco/completo comes from tapping the live timer (chip, Now Bar).
+      if (param === 'completo') setFocusFull(true);
+    }
     else if (path === 'amigos') {
       setTab('amigos');
       // ritmo://amigos/<id> opens that friend's sheet (e.g. "X aceptó tu solicitud").
@@ -227,7 +242,7 @@ export default function App() {
     let notifSub: { remove: () => void } | null = null;
     if (Platform.OS !== 'web') {
       const onResponse = async (r: Notifications.NotificationResponse) => {
-        const data = (r.notification.request.content.data ?? {}) as { url?: string; taskId?: string; habitId?: string };
+        const data = (r.notification.request.content.data ?? {}) as { url?: string; taskId?: string; habitId?: string; sharedId?: string };
         if (r.actionIdentifier && r.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
           await applyAction(r.actionIdentifier, data);
           await reloadAll();
@@ -316,6 +331,7 @@ export default function App() {
                 <Today
                   api={api}
                   habitsApi={habitsApi}
+                  sharedApi={sharedApi}
                   gender={settings.gender}
                   name={settings.name}
                   onAdd={() => setAdding(true)}
@@ -328,7 +344,7 @@ export default function App() {
                   }}
                 />
               )}
-              {tab === 'foco' && <Focus api={api} focus={focus} setFocus={setFocus} />}
+              {tab === 'foco' && <Focus api={api} focus={focus} setFocus={setFocus} full={focusFull} onFull={setFocusFull} />}
               {tab === 'amigos' && (
                 <Friends
                   signedIn={Boolean(account.email)}
@@ -341,6 +357,7 @@ export default function App() {
                   history={history}
                   openFriendId={openFriendId}
                   onFriendOpened={() => setOpenFriendId(null)}
+                  sharedApi={sharedApi}
                 />
               )}
               {tab === 'resumen' && <Summary api={api} habits={habitsApi.habits} name={settings.name} onOpenSettings={() => setShowSettings(true)} />}
@@ -373,6 +390,7 @@ export default function App() {
                       onConfirm: async () => {
                         await unregisterPush().catch(() => {});
                         await signOut();
+                        await clearSharedCache();
                         setAccount({ email: null, syncing: false });
                       },
                     })

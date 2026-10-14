@@ -101,6 +101,31 @@ export async function resetPassword(email: string) {
   if (error) throw error;
 }
 
+const EMAIL_CODE_KEY = 'ritmo.emailcode.v1';
+
+/**
+ * Do account emails carry the 6-digit code? Only with our own SMTP and
+ * templates (the server flow sets app_flags.email_code). Supabase's default
+ * mailer sends just the link, so until then the app doesn't ask for a code.
+ * Cached, so the answer is instant and survives having no connection.
+ */
+export async function emailHasCode(): Promise<boolean> {
+  const cached = await AsyncStorage.getItem(EMAIL_CODE_KEY).catch(() => null);
+  try {
+    const { data, error } = await supabase.from('app_flags').select('value').eq('key', 'email_code').maybeSingle();
+    if (error) throw error;
+    const on = data?.value === true;
+    AsyncStorage.setItem(EMAIL_CODE_KEY, on ? '1' : '0').catch(() => {});
+    return on;
+  } catch {
+    return cached === '1';
+  }
+}
+
+export async function emailHasCodeCached(): Promise<boolean> {
+  return (await AsyncStorage.getItem(EMAIL_CODE_KEY).catch(() => null)) === '1';
+}
+
 export type EmailCodeKind = 'signup' | 'link' | 'recovery';
 
 /**

@@ -13,17 +13,24 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.WindowManager
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.time.Duration
+import java.time.Instant
 
 /**
- * Ongoing focus-timer notification, built to qualify as an Android 16 Live Update
- * (status-bar chip + Samsung Now Bar on One UI 8):
+ * Ongoing focus-timer notification, built to qualify as a Live Update
+ * (status-bar chip + Samsung Now Bar on One UI 8 and 9):
  *  - ongoing, with a title, not colorized, no custom views, not a group summary
- *  - ProgressStyle on Android 16+ (the style Google's own Live Update sample uses)
+ *  - Android 17+: MetricStyle with one countdown metric. The system draws it
+ *    large and counts it down by itself; it is the Live Update template meant
+ *    for timers. Built by reflection so the module still compiles with SDK 36.
+ *  - Android 16: ProgressStyle (the style Google's own Live Update sample uses)
  *  - promotion requested through the API and the extra
  *  - POST_PROMOTED_NOTIFICATIONS declared in the manifest
  * Below Android 16 it is a regular ongoing notification with a system countdown.
+ * Tapping it opens MRitmo's full-screen timer (ritmo://foco/completo).
  */
 class RitmoLiveModule : Module() {
   private val context: Context
@@ -32,6 +39,7 @@ class RitmoLiveModule : Module() {
   private val handler = Handler(Looper.getMainLooper())
   private var current: Live? = null
   private var lastBuilt: Notification? = null
+  private var lastStyle: String = "none"
 
   private data class Live(val title: String, val endsAt: Long?, val remainingMs: Long?, val totalMs: Long)
 
@@ -86,12 +94,30 @@ class RitmoLiveModule : Module() {
       }
       mapOf(
         "sdk" to sdk,
+        "style" to lastStyle,
         "manufacturer" to Build.MANUFACTURER,
         "canPost" to canPost,
         "promotable" to promotable,
         "active" to active,
         "promoted" to promoted,
       )
+    }
+
+    /** Opens the phone's email app (its inbox, not a new message). Throws if there is none. */
+    Function("openEmailApp") {
+      val intent = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_EMAIL)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      requireNotNull(intent.resolveActivity(context.packageManager)) { "No email app" }
+      context.startActivity(intent)
+    }
+
+    /** Keeps the screen on while the full-screen timer is open. */
+    Function("keepScreenOn") { on: Boolean ->
+      val activity = appContext.currentActivity ?: return@Function
+      activity.runOnUiThread {
+        if (on) activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+      }
     }
 
     /** Opens the per-app Live Updates switch (Android 16), or the app's notification settings. */
@@ -127,7 +153,7 @@ class RitmoLiveModule : Module() {
   }
 
   private fun openAppIntent(): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("ritmo://foco")).apply {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("ritmo://foco/completo")).apply {
       setPackage(context.packageName)
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
@@ -198,6 +224,7 @@ class RitmoLiveModule : Module() {
         .addAction(action("Terminé", "DONE", 43))
     }
 
+    lastStyle = "standard"
     if (Build.VERSION.SDK_INT >= 36) applyLiveUpdate(builder, live, remaining)
     else builder.extras.putBoolean(EXTRA_REQUEST_PROMOTED, true)
 
@@ -206,17 +233,52 @@ class RitmoLiveModule : Module() {
     manager().notify(NOTIFICATION_ID, notification)
   }
 
-  /** Android 16: ProgressStyle + explicit promotion request + chip text when paused. */
+  /**
+   * Android 17 (One UI 9): MetricStyle with a single countdown metric, so the
+   * time fills the expanded Live Update. java.time types; the countdown runs in
+   * the system (TimeDifference.forTimer), no updates from us needed.
+   */
+  private fun applyMetricStyle(builder: Notification.Builder, live: Live, remaining: Long): Boolean {
+    if (Build.VERSION.SDK_INT < 37) return false
+    return try {
+      val metricCls = Class.forName("android.app.Notification\$Metric")
+      val valueCls = Class.forName("android.app.Notification\$Metric\$MetricValue")
+      val diffCls = Class.forName("android.app.Notification\$Metric\$TimeDifference")
+      val styleCls = Class.forName("android.app.Notification\$MetricStyle")
+      val format = diffCls.getField("FORMAT_CHRONOMETER").getInt(null)
+      val value = if (live.endsAt != null) {
+        diffCls.getMethod("forTimer", Instant::class.java, Int::class.javaPrimitiveType)
+          .invoke(null, Instant.ofEpochMilli(live.endsAt), format)
+      } else {
+        diffCls.getMethod("forPausedTimer", Duration::class.java, Int::class.javaPrimitiveType)
+          .invoke(null, Duration.ofMillis(remaining), format)
+      }
+      val label = if (live.endsAt != null) "Quedan" else "En pausa"
+      val metric = metricCls.getConstructor(valueCls, String::class.java).newInstance(value, label)
+      val style = styleCls.getConstructor().newInstance()
+      styleCls.getMethod("addMetric", metricCls).invoke(style, metric)
+      builder.setStyle(style as Notification.Style)
+      lastStyle = "metric"
+      true
+    } catch (_: Throwable) {
+      false
+    }
+  }
+
+  /** Android 16+: big countdown (17+) or ProgressStyle, explicit promotion request, chip text when paused. */
   private fun applyLiveUpdate(builder: Notification.Builder, live: Live, remaining: Long) {
     val total = live.totalMs.coerceAtLeast(1L)
     val done = ((total - remaining).coerceIn(0L, total) * 1000L / total).toInt()
-    try {
-      val style = Notification.ProgressStyle()
-        .setStyledByProgress(true)
-        .setProgressSegments(listOf(Notification.ProgressStyle.Segment(1000).setColor(Color.WHITE)))
-        .setProgress(done)
-      builder.setStyle(style)
-    } catch (_: Throwable) {
+    if (!applyMetricStyle(builder, live, remaining)) {
+      try {
+        val style = Notification.ProgressStyle()
+          .setStyledByProgress(true)
+          .setProgressSegments(listOf(Notification.ProgressStyle.Segment(1000).setColor(Color.WHITE)))
+          .setProgress(done)
+        builder.setStyle(style)
+        lastStyle = "progress"
+      } catch (_: Throwable) {
+      }
     }
 
     // setRequestPromotedOngoing arrived in API 36.1; the extra works on 36.0 too.

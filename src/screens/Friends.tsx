@@ -8,6 +8,7 @@ import type { ConfirmRequest } from '../components/ConfirmSheet';
 import { FriendSheet } from '../components/FriendSheet';
 import { NAV_HEIGHT } from '../components/NavBar';
 import { Press } from '../components/Press';
+import { SharedHabits } from '../components/SharedHabits';
 import { UsernameField } from '../components/UsernameField';
 import type { Gender } from '../data';
 import { formatShort } from '../format';
@@ -28,6 +29,8 @@ import {
   USERNAME_RE,
 } from '../friends';
 import * as Haptics from '../haptics';
+import { friendName, SharedHabit } from '../shared';
+import type { SharedApi } from '../store';
 import { font, radius, space, type, useTheme } from '../theme';
 
 type Props = {
@@ -43,6 +46,8 @@ type Props = {
   /** Open this friend's sheet as soon as they are on the board (from a notification). */
   openFriendId?: string | null;
   onFriendOpened?: () => void;
+  /** Shared habits (1.7): on each friend's sheet and as invitations here. */
+  sharedApi: SharedApi;
 };
 
 const empty: FriendsState = { me: null, friends: [], incoming: [], outgoing: [], progress: {} };
@@ -57,7 +62,7 @@ function Header({ title, right }: { title: string; right?: React.ReactNode }) {
   );
 }
 
-export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onProfileReady, history, openFriendId, onFriendOpened }: Props) {
+export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onProfileReady, history, openFriendId, onFriendOpened, sharedApi }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const [st, setSt] = useState<FriendsState>(empty);
@@ -251,15 +256,35 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
     onConfirm({
       title: '¿Eliminar amigo?',
       subject: p.display_name || `@${p.username}`,
-      detail: `@${p.username} dejará de ver tu avance y tú el suyo.`,
+      detail: `@${p.username} dejará de ver tu avance y tú el suyo. También se quitan los hábitos que tienen juntos.`,
       confirmLabel: 'Eliminar',
       destructive: true,
       onConfirm: async () => {
         await removeFriend(p.id);
         load();
+        sharedApi.reload();
       },
     });
   };
+
+  /** Decline or cancel an invitation at once; leaving an active habit asks first. */
+  const removeShared = (h: SharedHabit) => {
+    if (h.status === 'pending') {
+      sharedApi.remove(h.id).catch(() => {});
+      return;
+    }
+    setSheetOpen(false);
+    onConfirm({
+      title: '¿Dejar el hábito?',
+      subject: h.title,
+      detail: `Se quita para ti y para ${friendName(h.friend)}, y se pierde la racha compartida.`,
+      confirmLabel: 'Dejar hábito',
+      destructive: true,
+      onConfirm: () => sharedApi.remove(h.id).catch(() => {}),
+    });
+  };
+
+  const habitInvites = sharedApi.habits.filter((h) => h.status === 'pending' && !h.mine);
 
   const liveSheetRow = board.find((r) => r.profile.id === sheetId) ?? null;
   if (liveSheetRow) lastSheetRow.current = liveSheetRow;
@@ -403,6 +428,53 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
         </>
       )}
 
+      {habitInvites.length > 0 && (
+        <>
+          <Header title="Hábitos juntos" />
+          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+            {habitInvites.map((h, i) => (
+              <View
+                key={h.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  minHeight: 64,
+                  paddingHorizontal: space.lg,
+                  gap: space.md,
+                  borderBottomWidth: i === habitInvites.length - 1 ? 0 : 1,
+                  borderBottomColor: c.separator,
+                }}
+              >
+                <Avatar gender={h.friend.gender} mood="foco" px={2} still />
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.body, { color: c.text }]} numberOfLines={1}>{h.title}</Text>
+                  <Text style={[type.footnote, { color: c.textSecondary }]} numberOfLines={1}>{friendName(h.friend)} te invita</Text>
+                </View>
+                <Press
+                  onPress={() => sharedApi.remove(h.id).catch(() => {})}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Rechazar ${h.title}`}
+                  style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}
+                >
+                  <Ionicons name="close" size={20} color={c.text} />
+                </Press>
+                <Press
+                  onPress={async () => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                    await sharedApi.accept(h.id).catch(() => {});
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Aceptar ${h.title}`}
+                  style={{ height: 40, paddingHorizontal: space.lg, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: c.ink }}
+                >
+                  <Text style={[type.callout, { color: c.inkOnInk, fontFamily: font.semibold }]}>Aceptar</Text>
+                </Press>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
       <Header title="Agregar amigo" />
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -464,7 +536,18 @@ export function Friends({ signedIn, name, gender, mine, onAuth, onConfirm, onPro
         now={now}
         onClose={() => setSheetOpen(false)}
         onRemove={sheetRow && !sheetRow.me ? () => askRemove(sheetRow.profile) : undefined}
-      />
+      >
+        {sheetRow && !sheetRow.me ? (
+          <SharedHabits
+            friend={sheetRow.profile}
+            habits={sharedApi.habits.filter((h) => h.friend.id === sheetRow.profile.id)}
+            onToggle={sharedApi.toggleToday}
+            onInvite={(title) => sharedApi.invite(sheetRow.profile.id, title)}
+            onAccept={sharedApi.accept}
+            onRemove={removeShared}
+          />
+        ) : null}
+      </FriendSheet>
     </ScrollView>
   );
 }

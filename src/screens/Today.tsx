@@ -14,12 +14,15 @@ import type { ConfirmRequest } from '../components/ConfirmSheet';
 import { CheckRow, TaskRow } from '../components/TaskRow';
 import { streakOf } from '../data';
 import { dayChip, formatMinutes, hhmmLabel, longDate, timeLabel } from '../format';
-import { Habit, HabitsApi, progressOf, Task, TasksApi } from '../store';
+import { friendName, markedBy, SharedHabit, sharedStreak } from '../shared';
+import { Habit, HabitsApi, progressOf, SharedApi, Task, TasksApi } from '../store';
 import { radius, space, type, useTheme } from '../theme';
 
 type Props = {
   api: TasksApi;
   habitsApi: HabitsApi;
+  /** Habits kept with a friend (1.7). */
+  sharedApi: SharedApi;
   gender: Gender;
   name: string;
   onAdd: () => void;
@@ -39,11 +42,14 @@ function SectionHeader({ title, count }: { title: string; count?: string }) {
   );
 }
 
-export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm, onActions, onEdit }: Props) {
+export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus, onConfirm, onActions, onEdit }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { todayTasks, carryover, upcoming } = api;
   const { habits } = habitsApi;
+  const shared = sharedApi.active;
+  const habitCount = habits.length + shared.length;
+  const habitsDone = habits.filter((h) => h.checks.includes(api.today)).length + shared.filter((h) => markedBy(h, api.today).me).length;
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
   const taskActions = (t: Task) =>
@@ -70,6 +76,22 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm,
       confirmLabel: 'Eliminar',
       destructive: true,
       onConfirm: () => api.remove(t.id),
+    });
+
+  const sharedActions = (h: SharedHabit) =>
+    onActions({
+      title: h.title,
+      detail: `Con ${friendName(h.friend)} · racha de ${sharedStreak(h, api.today)}`,
+      deleteLabel: 'Dejar hábito',
+      onDelete: () =>
+        onConfirm({
+          title: '¿Dejar el hábito?',
+          subject: h.title,
+          detail: `Se quita para ti y para ${friendName(h.friend)}, y se pierde la racha de ${sharedStreak(h, api.today)}.`,
+          confirmLabel: 'Dejar hábito',
+          destructive: true,
+          onConfirm: () => sharedApi.remove(h.id).catch(() => {}),
+        }),
     });
 
   const askRemoveHabit = (h: Habit) =>
@@ -186,7 +208,7 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm,
             }}
           >
             <Ionicons name="add" size={20} color={c.inkOnInk} />
-            <Text style={[type.headline, { color: c.inkOnInk }]}>{habits.length ? 'Agregar tarea' : 'Primera tarea'}</Text>
+            <Text style={[type.headline, { color: c.inkOnInk }]}>{habitCount ? 'Agregar tarea' : 'Primera tarea'}</Text>
           </Press>
         </View>
       ) : (
@@ -202,9 +224,9 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm,
         </>
       )}
 
-      {habits.length > 0 && (
+      {habitCount > 0 && (
         <>
-          <SectionHeader title="Hábitos" count={`${habits.filter((h) => h.checks.includes(api.today)).length} de ${habits.length}`} />
+          <SectionHeader title="Hábitos" count={`${habitsDone} de ${habitCount}`} />
           <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {habits.map((h, i) => {
               const checked = h.checks.includes(api.today);
@@ -216,11 +238,31 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm,
                     checked={checked}
                     title={h.title}
                     meta={h.time ? `Recordatorio ${hhmmLabel(h.time)}` : undefined}
-                    last={i === habits.length - 1}
+                    last={i === habitCount - 1}
                     checkLabel={checked ? `Desmarcar ${h.title}` : `Marcar ${h.title} como hecho hoy`}
                     onToggle={() => habitsApi.toggleToday(h.id)}
                     onLongPress={() => habitActions(h)}
                     right={<Streak n={streak} lit={checked} />}
+                  />
+                </Animated.View>
+              );
+            })}
+            {shared.map((h, i) => {
+              const m = markedBy(h, api.today);
+              const who = friendName(h.friend);
+              const meta = m.me && m.them ? `Con ${who} · marcaron los dos` : m.them ? `Con ${who} · ya marcó, faltas tú` : m.me ? `Con ${who} · falta ${who}` : `Con ${who}`;
+              return (
+                <Animated.View key={h.id} entering={FadeIn.duration(200)} layout={LinearTransition.duration(240)}>
+                  <CheckRow
+                    square
+                    checked={m.me}
+                    title={h.title}
+                    meta={meta}
+                    last={habits.length + i === habitCount - 1}
+                    checkLabel={m.me ? `Desmarcar ${h.title}` : `Marcar ${h.title} como hecho hoy, con ${who}`}
+                    onToggle={() => sharedApi.toggleToday(h.id)}
+                    onLongPress={() => sharedActions(h)}
+                    right={<Streak n={sharedStreak(h, api.today)} lit={m.me && m.them} shared />}
                   />
                 </Animated.View>
               );
@@ -253,7 +295,7 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm,
         </>
       )}
 
-      {(todayTasks.length > 0 || habits.length > 0) && (
+      {(todayTasks.length > 0 || habitCount > 0) && (
         <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.lg, textAlign: 'center' }]}>
           Toca una tarea para enfocarte. Mantén presionado para editar o eliminar.
         </Text>
@@ -262,15 +304,19 @@ export function Today({ api, habitsApi, gender, name, onAdd, onFocus, onConfirm,
   );
 }
 
-/** Streak counter: a flame in the ink color (white in dark mode, black in light). */
-function Streak({ n, lit }: { n: number; lit: boolean }) {
+/**
+ * Streak counter: a flame in the ink color (white in dark mode, black in light).
+ * A shared streak adds a small "people" mark: it only lights when both marked.
+ */
+function Streak({ n, lit, shared }: { n: number; lit: boolean; shared?: boolean }) {
   const { c } = useTheme();
   return (
     <View
       style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: space.md, opacity: n === 0 && !lit ? 0.45 : 1 }}
       accessible
-      accessibilityLabel={`Racha de ${n} ${n === 1 ? 'día' : 'días'}`}
+      accessibilityLabel={`Racha${shared ? ' compartida' : ''} de ${n} ${n === 1 ? 'día' : 'días'}`}
     >
+      {shared && <Ionicons name="people-outline" size={15} color={c.textSecondary} style={{ marginRight: 3 }} />}
       <Ionicons name={lit ? 'flame' : 'flame-outline'} size={18} color={c.text} />
       <Text style={[type.callout, { color: c.text, fontVariant: ['tabular-nums'], fontFamily: 'Inter_600SemiBold' }]}>{n}</Text>
     </View>

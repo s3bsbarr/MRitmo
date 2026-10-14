@@ -8,9 +8,12 @@ name: Amigo bot
 #   avanzar    +30 min to the bot's day and 25 min in focus
 #   completar  the bot finishes its day (100 %)
 #   quitar     removes the friendship (add @amigobot from the app: it accepts by itself)
+#   habito     the bot invites you to a shared habit (title in "usuario", optional)
+#   marcar     the bot marks its shared habits today ("Amigo Bot ya marcó, faltas tú")
 #   estado     the bot's last days and the last notifications sent
 #
 # Its progress also moves by itself every minute from 7:00 to 21:00 (Bogotá).
+# It accepts shared-habit invites by itself and marks its habits during the day.
 
 on:
   workflow_dispatch:
@@ -19,9 +22,9 @@ on:
         description: Qué hacer
         type: choice
         default: estado
-        options: [preparar, solicitud, avanzar, completar, quitar, estado]
+        options: [preparar, solicitud, avanzar, completar, quitar, habito, marcar, estado]
       usuario:
-        description: Tu @usuario de MRitmo (solo para "preparar")
+        description: Tu @usuario (para "preparar") o el título del hábito (para "habito")
         type: string
         required: false
 

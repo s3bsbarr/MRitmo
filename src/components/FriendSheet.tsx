@@ -22,10 +22,7 @@ type Props = {
   now: number;
   onClose: () => void;
   onRemove?: () => void;
-  /**
-   * Room for what comes next on this sheet (1.7: shared habits and
-   * "Crear hábito juntos"). Rendered between the week and the footer.
-   */
+  /** Shared habits and "Crear hábito juntos" (1.7). Rendered between the week and the footer. */
   children?: React.ReactNode;
 };
 
@@ -59,7 +56,7 @@ function FriendBody({ row, days, error, now, onRemove, children }: Omit<Props, '
   const fullDays = week ? week.filter((d) => d.ratio !== null && d.ratio >= 1).length : null;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+    <ScrollView showsVerticalScrollIndicator={false} bounces={false} keyboardShouldPersistTaps="handled">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg }}>
         <Avatar gender={row.profile.gender} mood={moodFor(row.ratio, row.total > 0)} px={3} />
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -150,7 +147,9 @@ function FriendBody({ row, days, error, now, onRemove, children }: Omit<Props, '
       {children}
 
       <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.xl, textAlign: 'center' }]}>
-        {row.me ? 'Así te ven tus amigos: solo el % y los minutos, nunca tus tareas.' : 'Solo ves su % y sus minutos, nunca sus tareas.'}
+        {row.me
+          ? 'Así te ven tus amigos: solo el % y los minutos, nunca tus tareas.'
+          : 'Solo ves su % y sus minutos, nunca sus tareas. Los hábitos juntos los ven los dos.'}
       </Text>
 
       {onRemove && !row.me && (

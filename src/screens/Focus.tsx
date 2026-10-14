@@ -3,6 +3,7 @@ import * as Haptics from '../haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FocusFull } from '../components/FocusFull';
 import { NAV_HEIGHT } from '../components/NavBar';
 import { Press } from '../components/Press';
 import { ProgressBar } from '../components/ProgressBar';
@@ -14,9 +15,16 @@ export { emptyFocus } from '../data';
 export type { FocusState } from '../data';
 import { emptyFocus as EMPTY, extendFocus, focusOn, pauseFocus, resumeFocus, totalOf, type FocusState } from '../data';
 
-type Props = { api: TasksApi; focus: FocusState; setFocus: (f: FocusState) => void };
+type Props = {
+  api: TasksApi;
+  focus: FocusState;
+  setFocus: (f: FocusState) => void;
+  /** Full-screen timer (opened from the live notification or the expand button). */
+  full: boolean;
+  onFull: (open: boolean) => void;
+};
 
-export function Focus({ api, focus, setFocus }: Props) {
+export function Focus({ api, focus, setFocus, full, onFull }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const task = api.tasks.find((t) => t.id === focus.taskId) ?? null;
@@ -72,7 +80,10 @@ export function Focus({ api, focus, setFocus }: Props) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     api.complete(task.id);
     setFocus(EMPTY);
+    onFull(false);
   };
+
+  const active = task !== null && !task.done;
 
   return (
     <ScrollView
@@ -84,9 +95,24 @@ export function Focus({ api, focus, setFocus }: Props) {
       }}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">
-        Foco
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">
+          Foco
+        </Text>
+        {active && (
+          <Press
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+              onFull(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Temporizador a pantalla completa"
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="expand-outline" size={20} color={c.text} />
+          </Press>
+        )}
+      </View>
 
       {task && !task.done ? (
         <View style={{ flex: 1, justifyContent: 'center', paddingVertical: space.xxxl }}>
@@ -188,6 +214,19 @@ export function Focus({ api, focus, setFocus }: Props) {
           )}
         </View>
       )}
+
+      <FocusFull
+        visible={full && active}
+        task={active ? task : null}
+        remaining={remaining}
+        totalMs={totalMs}
+        running={running}
+        started={Boolean(focus.started)}
+        onClose={() => onFull(false)}
+        onStartPause={startPause}
+        onPlusFive={addFive}
+        onDone={completeTask}
+      />
     </ScrollView>
   );
 }

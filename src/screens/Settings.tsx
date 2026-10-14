@@ -118,13 +118,27 @@ function LiveSection() {
           ['Temporizador visible', d.active ? 'Sí' : 'No hay foco en curso'],
           ['Cumple los requisitos', yes(d.promotable, 'Sí', 'No', d.active ? '—' : 'Inicia un foco')],
           ['Promovido a Live Update', d.active ? yes(d.promoted, 'Sí', 'No') : '—'],
+          [
+            'Plantilla',
+            !d.active
+              ? d.sdk >= 37
+                ? 'Números grandes (Android 17)'
+                : 'Barra de progreso (Android 16)'
+              : d.style === 'metric'
+                ? 'Números grandes'
+                : d.style === 'progress'
+                  ? d.sdk >= 37
+                    ? 'Barra (falló la de números)'
+                    : 'Barra de progreso'
+                  : 'Estándar',
+          ],
         ]
     : [];
 
   return (
     <Section
       title="Temporizador en vivo"
-      note="Con un foco en curso, el temporizador debe aparecer en la barra de estado y en la Now Bar. Si dice “No” en Promovido, envía una captura de esta sección."
+      note="Con un foco en curso, el temporizador debe aparecer en la barra de estado y en la Now Bar. En Android 17 (One UI 9) se expande con la cuenta regresiva en grande; al tocarlo se abre a pantalla completa. Si dice “No” en Promovido, envía una captura de esta sección."
     >
       <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
         {rows.map(([label, value], i) => (
@@ -425,6 +439,12 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
               detail={settings.remindFriends ? pushStatusLabel(push) : 'Apagadas: no te avisamos de solicitudes'}
               value={settings.remindFriends}
               onChange={(v) => update({ remindFriends: v })}
+            />
+            <ToggleRow
+              label="Hábitos juntos"
+              detail={settings.remindShared ? pushStatusLabel(push, 'habits') : 'Apagadas: no te avisamos de invitaciones ni marcas'}
+              value={settings.remindShared}
+              onChange={(v) => update({ remindShared: v })}
               last
             />
           </View>

@@ -8,11 +8,14 @@ import { Sheet } from './Sheet';
 export type ItemActions = {
   title: string;
   detail?: string;
-  onEdit: () => void;
+  /** Absent for items that can't be edited here (a shared habit). */
+  onEdit?: () => void;
   onDelete: () => void;
+  /** "Eliminar" by default; "Dejar hábito" for a shared one. */
+  deleteLabel?: string;
 };
 
-/** Long-press menu for a task or habit: edit or delete, in the app's own style. */
+/** Long-press menu for a task or habit: edit or delete (or leave, for a shared habit), in the app's own style. */
 export function ActionsSheet({ request, onClose }: { request: ItemActions | null; onClose: () => void }) {
   const { c } = useTheme();
   const row = (icon: keyof typeof Ionicons.glyphMap, label: string, color: string, onPress: () => void, last = false) => (
@@ -49,8 +52,8 @@ export function ActionsSheet({ request, onClose }: { request: ItemActions | null
           </Text>
           {request.detail ? <Text style={[type.callout, { color: c.textSecondary, marginTop: space.xs }]}>{request.detail}</Text> : null}
           <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden', marginTop: space.xl }}>
-            {row('create-outline', 'Editar', c.text, request.onEdit)}
-            {row('trash-outline', 'Eliminar', c.danger, request.onDelete, true)}
+            {request.onEdit && row('create-outline', 'Editar', c.text, request.onEdit)}
+            {row('trash-outline', request.deleteLabel ?? 'Eliminar', c.danger, request.onDelete, true)}
           </View>
           <Press
             onPress={onClose}

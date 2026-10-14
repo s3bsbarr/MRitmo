@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import RitmoLive from '../modules/ritmo-live/src/RitmoLiveModule';
+import type { SharedHabit } from './shared';
 import {
   atTime,
   dayKey,
@@ -32,7 +33,7 @@ export const CH = {
   tasks: 'ritmo_tasks_v2',
   reminders: 'ritmo_reminders_v2',
   motivation: 'ritmo_motivation_v2',
-  /** Server push about friends (requests, acceptances; shared habits in 1.7). */
+  /** Server push about friends: requests, acceptances and shared habits. */
   friends: 'ritmo_friends',
 };
 
@@ -45,6 +46,9 @@ export const CAT = {
   soon: 'ritmo_task_soon',
   overdue: 'ritmo_overdue',
   habit: 'ritmo_habit',
+  /** Server push (1.7): ids must match categoryId in supabase/functions/push. */
+  sharedInvite: 'ritmo_shared_invite',
+  sharedNudge: 'ritmo_shared_nudge',
 };
 
 export const ACTION = {
@@ -56,6 +60,8 @@ export const ACTION = {
   startTask: 'START_TASK',
   snooze: 'SNOOZE15',
   checkHabit: 'CHECK_HABIT',
+  acceptShared: 'ACCEPT_SHARED',
+  checkShared: 'CHECK_SHARED',
 } as const;
 
 const CHIME = 'ritmo_chime.wav';
@@ -97,7 +103,7 @@ function setup() {
       }).catch(() => {});
       await Notifications.setNotificationChannelAsync(CH.friends, {
         name: 'Amigos',
-        description: 'Solicitudes de amistad y cuando alguien te acepta.',
+        description: 'Solicitudes de amistad, quién te acepta y hábitos juntos.',
         importance: Notifications.AndroidImportance.HIGH,
         sound: SOFT,
       }).catch(() => {});
@@ -117,6 +123,12 @@ function setup() {
     ]).catch(() => {});
     await Notifications.setNotificationCategoryAsync(CAT.habit, [
       { identifier: ACTION.checkHabit, buttonTitle: 'Hecho', options: bg },
+    ]).catch(() => {});
+    await Notifications.setNotificationCategoryAsync(CAT.sharedInvite, [
+      { identifier: ACTION.acceptShared, buttonTitle: 'Aceptar', options: bg },
+    ]).catch(() => {});
+    await Notifications.setNotificationCategoryAsync(CAT.sharedNudge, [
+      { identifier: ACTION.checkShared, buttonTitle: 'Hecho', options: bg },
     ]).catch(() => {});
   })();
   return setupDone;
@@ -174,7 +186,14 @@ export function syncFocus(focus: FocusState, tasks: Task[]) {
 
 /* ─── Scheduled notifications ─────────────────────────────────────────────── */
 
-export type Snapshot = { tasks: Task[]; habits: Habit[]; focus: FocusState; settings: Settings };
+export type Snapshot = {
+  tasks: Task[];
+  habits: Habit[];
+  focus: FocusState;
+  settings: Settings;
+  /** Active shared habits (1.7), from the phone's copy. They count in "Cierra tu día". */
+  shared?: SharedHabit[];
+};
 
 const MOTIVATION = [
   'Lo que hagas antes del mediodía define el resto del día. Empieza por lo que más pesa.',
@@ -298,7 +317,8 @@ export function plan(snap: Snapshot, now = Date.now()): Planned[] {
       let body = 'Marca lo que terminaste y pasa lo pendiente a mañana.';
       if (i === 0) {
         const pendingTasks = dayTasks.filter((t) => !t.done).length;
-        const pendingHabits = habits.filter((h) => !h.checks.includes(day)).length;
+        const pendingHabits =
+          habits.filter((h) => !h.checks.includes(day)).length + (snap.shared ?? []).filter((h) => h.status === 'active' && !h.myChecks.includes(day)).length;
         const parts = [
           pendingTasks ? `${pendingTasks} ${pendingTasks === 1 ? 'tarea' : 'tareas'}` : '',
           pendingHabits ? `${pendingHabits} ${pendingHabits === 1 ? 'hábito' : 'hábitos'}` : '',

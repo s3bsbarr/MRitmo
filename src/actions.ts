@@ -22,10 +22,11 @@ import {
   saveTasks,
 } from './data';
 import { ACTION, refreshWidgets, Snapshot, syncFocus, syncSchedule } from './effects';
+import { acceptShared, activeShared, fetchShared, loadSharedCache, setSharedMark } from './shared';
 
 export async function loadSnapshot(): Promise<Snapshot> {
-  const [tasks, habits, focus, settings] = await Promise.all([loadTasks(), loadHabits(), loadFocus(), loadSettings()]);
-  return { tasks, habits, focus, settings };
+  const [tasks, habits, focus, settings, shared] = await Promise.all([loadTasks(), loadHabits(), loadFocus(), loadSettings(), loadSharedCache()]);
+  return { tasks, habits, focus, settings, shared: activeShared(shared.habits) };
 }
 
 /**
@@ -43,7 +44,21 @@ export async function resyncAll(snap?: Snapshot, opts: { immediate?: boolean } =
   return s;
 }
 
-export async function applyAction(action: string, payload: { taskId?: string; habitId?: string } = {}, opts: { immediate?: boolean } = {}) {
+export type ActionPayload = { taskId?: string; habitId?: string; sharedId?: string };
+
+export async function applyAction(action: string, payload: ActionPayload = {}, opts: { immediate?: boolean } = {}) {
+  // Shared habits live on the server: these buttons (from a push) write there, app open or closed.
+  if (action === ACTION.acceptShared || action === ACTION.checkShared) {
+    if (payload.sharedId) {
+      try {
+        if (action === ACTION.acceptShared) await acceptShared(payload.sharedId);
+        else await setSharedMark(payload.sharedId, true);
+        await fetchShared();
+      } catch {}
+    }
+    return resyncAll(undefined, opts);
+  }
+
   const snap = await loadSnapshot();
   let { tasks, habits, focus } = snap;
   const now = Date.now();

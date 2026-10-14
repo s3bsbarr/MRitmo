@@ -1,8 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, TextInput, View } from 'react-native';
+import RitmoLive from '../../modules/ritmo-live/src/RitmoLiveModule';
 import * as Haptics from '../haptics';
-import { EmailCodeKind, friendlyError, resendSignup, resetPassword, signIn, signInWithLink, signUp, updatePassword, verifyEmailCode } from '../sync';
+import {
+  EmailCodeKind,
+  emailHasCode,
+  emailHasCodeCached,
+  friendlyError,
+  resendSignup,
+  resetPassword,
+  signIn,
+  signInWithLink,
+  signUp,
+  updatePassword,
+  verifyEmailCode,
+} from '../sync';
 import { font, radius, space, type, useTheme } from '../theme';
 import { Press } from './Press';
 import { Sheet } from './Sheet';
@@ -14,8 +27,10 @@ const EMAIL_RE = /\S+@\S+\.\S+/;
 
 /**
  * Create an account or sign in. Every email (activation, sign-in link, password
- * reset) carries a link and a 6-digit code: the code works even when the link
- * opens in a browser instead of MRitmo. On success the caller restores and backs up data.
+ * reset) carries a link; with MRitmo's own email it also carries a 6-digit
+ * code, which works even when the link opens in a browser. Without it (Supabase's
+ * default mailer, link only) the app never asks for a code it can't receive.
+ * On success the caller restores and backs up data.
  */
 export function AuthSheet({
   visible,
@@ -44,9 +59,12 @@ export function AuthSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [withCode, setWithCode] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
+    emailHasCodeCached().then(setWithCode);
+    emailHasCode().then(setWithCode);
     setMode(initialMode);
     setStep(initialStep);
     setPassword('');
@@ -87,7 +105,7 @@ export function AuthSheet({
       if (mode === 'signup') {
         const r = await signUp(email, password);
         if (r === 'confirm') {
-          toCode('signup', `Te enviamos un enlace y un código a ${email.trim()} para activar tu cuenta.`);
+          toCode('signup', withCode ? `Te enviamos un enlace y un código a ${email.trim()} para activar tu cuenta.` : `Te enviamos un enlace a ${email.trim()} para activar tu cuenta.`);
           return;
         }
       } else {
@@ -109,7 +127,7 @@ export function AuthSheet({
     setBusy(true);
     try {
       await signInWithLink(email);
-      toCode('link', `Te enviamos un enlace y un código a ${email.trim()}. Toca el enlace desde este teléfono o escribe el código.`);
+      toCode('link', withCode ? `Te enviamos un enlace y un código a ${email.trim()}. Toca el enlace desde este teléfono o escribe el código.` : `Te enviamos un enlace a ${email.trim()} para entrar.`);
     } catch (e) {
       fail(e);
     } finally {
@@ -125,7 +143,7 @@ export function AuthSheet({
     setBusy(true);
     try {
       await resetPassword(email);
-      toCode('recovery', `Te enviamos un enlace y un código a ${email.trim()} para elegir una contraseña nueva.`);
+      toCode('recovery', withCode ? `Te enviamos un enlace y un código a ${email.trim()} para elegir una contraseña nueva.` : `Te enviamos un enlace a ${email.trim()} para elegir una contraseña nueva.`);
     } catch (e) {
       fail(e);
     } finally {
@@ -141,7 +159,7 @@ export function AuthSheet({
       if (pending === 'recovery') await resetPassword(email);
       else if (pending === 'link') await signInWithLink(email);
       else await resendSignup(email);
-      setNotice(`Listo, revisa otra vez ${email.trim()}. Usa el código del correo más reciente.`);
+      setNotice(withCode ? `Listo, revisa otra vez ${email.trim()}. Usa el código del correo más reciente.` : `Listo, revisa otra vez ${email.trim()}. Abre el enlace del correo más reciente.`);
     } catch (e) {
       fail(e);
     } finally {
@@ -261,6 +279,44 @@ export function AuthSheet({
   );
 
   if (step === 'code') {
+    const back = () => {
+      setStep('form');
+      setNotice(null);
+      setError(null);
+    };
+
+    // Link only (no own email yet): open it from this phone and MRitmo finishes by itself.
+    if (!withCode) {
+      const canOpenMail = Platform.OS === 'android' && Boolean(RitmoLive?.openEmailApp);
+      return (
+        <Sheet visible={visible} onClose={onClose}>
+          <Text style={[type.title, { color: c.text }]}>Revisa tu correo</Text>
+          {messages}
+          <View style={{ marginTop: space.lg, gap: space.md }}>
+            {[
+              ['mail-open-outline', 'Abre el correo desde este teléfono. Llega de Supabase Auth, en inglés.'],
+              ['link-outline', pending === 'recovery' ? 'Toca el enlace: MRitmo se abre y te pide la contraseña nueva.' : 'Toca el enlace: MRitmo se abre y entras solo.'],
+              ['time-outline', 'Si no llega en unos minutos, revisa spam o promociones.'],
+            ].map(([icon, text]) => (
+              <View key={icon} style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
+                <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={c.text} />
+                <Text style={[type.callout, { color: c.textSecondary, flex: 1 }]}>{text}</Text>
+              </View>
+            ))}
+          </View>
+          {canOpenMail ? primary('Abrir el correo', () => {
+            try {
+              RitmoLive?.openEmailApp();
+            } catch {
+              setError('No encontramos una app de correo. Ábrelo como siempre.');
+            }
+          }, true) : null}
+          {textLink('Reenviar correo', resend)}
+          {textLink('Usar otro correo', back)}
+        </Sheet>
+      );
+    }
+
     const digits = code.replace(/\D/g, '');
     return (
       <Sheet visible={visible} onClose={onClose}>
@@ -285,11 +341,7 @@ export function AuthSheet({
         />
         {primary(pending === 'recovery' ? 'Continuar' : 'Entrar', verify, digits.length >= 6)}
         {textLink('Reenviar correo', resend)}
-        {textLink('Usar otro correo', () => {
-          setStep('form');
-          setNotice(null);
-          setError(null);
-        })}
+        {textLink('Usar otro correo', back)}
       </Sheet>
     );
   }
