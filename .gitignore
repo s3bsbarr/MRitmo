@@ -44,3 +44,6 @@ yarn-error.*
 google-services.json
 *service-account*.json
 *firebase-adminsdk*.json
+
+# Written by the "Web (mritmo.com)" workflow on deploy
+site/version.json

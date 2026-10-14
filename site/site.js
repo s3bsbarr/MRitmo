@@ -1,17 +1,70 @@
-/* MRitmo · mritmo.com — draws the app's pixel character and shows the latest version. */
+/* MRitmo · mritmo.com — theme switch, the app's pixel character and the latest version.
+   No cookies, no analytics, no third-party requests: the only thing stored is the theme
+   the visitor picks (localStorage "mritmo.theme"), and it never leaves the browser. */
 (function () {
-  var REPO = 's3bsbarr/MRitmo';
-  var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+  var KEY = 'mritmo.theme';
+  var root = document.documentElement;
+  var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  var COLORS = { light: '#f7f3ea', dark: '#000000' };
+
+  function stored() {
+    try {
+      var t = window.localStorage.getItem(KEY);
+      return t === 'light' || t === 'dark' ? t : 'system';
+    } catch (e) {
+      return 'system';
+    }
+  }
+
+  function effective(choice) {
+    if (choice === 'light' || choice === 'dark') return choice;
+    return media && media.matches ? 'dark' : 'light';
+  }
+
+  function apply(choice) {
+    if (choice === 'light' || choice === 'dark') root.setAttribute('data-theme', choice);
+    else root.removeAttribute('data-theme');
+    var metas = document.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < metas.length; i++) {
+      // An explicit choice overrides both system-specific metas.
+      var m = metas[i];
+      var scheme = m.getAttribute('data-scheme') || (/dark/.test(m.getAttribute('media') || '') ? 'dark' : 'light');
+      m.setAttribute('data-scheme', scheme);
+      m.setAttribute('content', choice === 'system' ? COLORS[scheme] : COLORS[choice]);
+    }
+    var buttons = document.querySelectorAll('[data-set-theme]');
+    for (var j = 0; j < buttons.length; j++) {
+      buttons[j].setAttribute('aria-pressed', buttons[j].getAttribute('data-set-theme') === choice ? 'true' : 'false');
+    }
+    draw();
+  }
+
+  function choose(choice) {
+    try {
+      if (choice === 'system') window.localStorage.removeItem(KEY);
+      else window.localStorage.setItem(KEY, choice);
+    } catch (e) {}
+    apply(choice);
+  }
 
   function draw() {
     var data = window.MRITMO_SPRITES;
     if (!data) return;
-    var palette = data.colors[dark && dark.matches ? 'dark' : 'light'];
+    var mode = effective(stored());
+    var palette = data.colors[mode];
+    if (mode === 'light') {
+      // Warm the cool greys (bench and "z") so they sit on the cream page.
+      var warm = {};
+      for (var k in palette) warm[k] = palette[k];
+      warm.B = '#e2dbcc';
+      warm.Z = '#9f9888';
+      palette = warm;
+    }
     var list = document.querySelectorAll('canvas[data-mood]');
     for (var i = 0; i < list.length; i++) {
       var c = list[i];
       var rows = (data.sprites[c.getAttribute('data-gender') || 'm'] || {})[c.getAttribute('data-mood')];
-      if (!rows) continue;
+      if (!rows || !c.getContext) continue;
       c.width = 24;
       c.height = 26;
       var ctx = c.getContext('2d');
@@ -27,25 +80,36 @@
     }
   }
 
+  // Version, size and date of the latest APK. /version.json is written on mritmo.com
+  // itself every time a release is published, so visitors never call GitHub's API.
   function version() {
     var spots = document.querySelectorAll('[data-version]');
     if (!spots.length || !window.fetch) return;
-    fetch('https://api.github.com/repos/' + REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
+    fetch('/version.json', { cache: 'no-cache' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (rel) {
-        if (!rel) return;
-        var apk = (rel.assets || []).filter(function (a) { return /\.apk$/i.test(a.name); })[0];
-        var v = String(rel.tag_name || '').replace(/^v/, '');
-        var mb = apk ? Math.round(apk.size / 1048576) + ' MB' : '';
-        var when = rel.published_at ? new Date(rel.published_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+        if (!rel || !rel.version) return;
+        var mb = rel.bytes ? Math.round(rel.bytes / 1048576) + ' MB' : '';
+        var when = rel.published ? new Date(rel.published).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
         for (var i = 0; i < spots.length; i++) {
-          spots[i].textContent = ['Versión ' + v, mb, when].filter(Boolean).join(' · ');
+          spots[i].textContent = ['Versión ' + rel.version, mb, when].filter(Boolean).join(' · ');
         }
       })
       .catch(function () {});
   }
 
-  draw();
+  var buttons = document.querySelectorAll('[data-set-theme]');
+  for (var b = 0; b < buttons.length; b++) {
+    buttons[b].addEventListener('click', function (e) {
+      choose(e.currentTarget.getAttribute('data-set-theme'));
+    });
+  }
+  if (media) {
+    var onChange = function () { if (stored() === 'system') draw(); };
+    if (media.addEventListener) media.addEventListener('change', onChange);
+    else if (media.addListener) media.addListener(onChange);
+  }
+
+  apply(stored());
   version();
-  if (dark && dark.addEventListener) dark.addEventListener('change', draw);
 })();

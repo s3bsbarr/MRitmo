@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Text, TextInput, View } from 'react-native';
 import RitmoLive from '../../modules/ritmo-live/src/RitmoLiveModule';
 import * as Haptics from '../haptics';
 import {
@@ -75,7 +75,8 @@ export function AuthSheet({
   }, [visible, initialMode, initialStep, initialError]);
 
   const emailOk = EMAIL_RE.test(email.trim());
-  const valid = emailOk && password.length >= 6;
+  const [agreed, setAgreed] = useState(false);
+  const valid = emailOk && password.length >= 6 && (mode !== 'signup' || agreed);
 
   const fail = (e: unknown) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
@@ -408,6 +409,47 @@ export function AuthSheet({
         />
         {passwordField(mode === 'signup' ? 'Contraseña (mínimo 6)' : 'Contraseña', submit, mode === 'signup')}
       </View>
+
+      {mode === 'signup' && (
+        <Press
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            setAgreed(!agreed);
+          }}
+          scaleTo={0.99}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: agreed }}
+          accessibilityLabel="Acepto los Términos y autorizo el tratamiento de mis datos según la Política de privacidad"
+          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.md, marginTop: space.lg }}
+        >
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 7,
+              borderWidth: agreed ? 0 : 1.6,
+              borderColor: c.textTertiary,
+              backgroundColor: agreed ? c.ink : 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 1,
+            }}
+          >
+            {agreed && <Ionicons name="checkmark" size={16} color={c.inkOnInk} />}
+          </View>
+          <Text style={[type.footnote, { color: c.textSecondary, flex: 1 }]}>
+            Acepto los{' '}
+            <Text style={{ color: c.text, textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://mritmo.com/terminos/').catch(() => {})} accessibilityRole="link">
+              Términos
+            </Text>{' '}
+            y autorizo el tratamiento de mis datos según la{' '}
+            <Text style={{ color: c.text, textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://mritmo.com/privacidad/').catch(() => {})} accessibilityRole="link">
+              Política de privacidad
+            </Text>
+            . Si eres menor de 18, necesitas el permiso de tu padre, madre o acudiente.
+          </Text>
+        </Press>
+      )}
 
       {messages}
 

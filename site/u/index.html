@@ -6,16 +6,15 @@
   <title>Te invitaron a MRitmo</title>
   <meta name="description" content="Agrégalo en MRitmo: avancen juntos, con el día medido en tiempo.">
   <meta name="robots" content="noindex">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#f7f3ea" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <meta property="og:title" content="Te invitaron a MRitmo">
   <meta property="og:description" content="Avancen juntos: el día medido en tiempo, con ranking en vivo.">
   <meta property="og:image" content="https://mritmo.com/icon.png">
   <link rel="icon" href="/favicon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
+  <script>try{var t=localStorage.getItem('mritmo.theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 </head>
 <body class="bridge">
   <!--
@@ -25,9 +24,9 @@
   -->
   <div class="wrap" style="width:100%">
     <header class="top">
-      <a class="brand" href="/"><img src="/icon.png" alt="" width="30" height="30">MRitmo</a>
+      <a class="brand" href="/" aria-label="MRitmo, inicio"><img src="/icon.png" alt="" width="30" height="30">MRitmo</a>
     </header>
-    <main>
+    <main id="contenido">
       <canvas data-gender="f" data-mood="fuerza" width="24" height="26" style="image-rendering:pixelated;width:96px;height:104px" aria-hidden="true"></canvas>
       <h1 id="title">Te invitaron a MRitmo.</h1>
       <p class="lead" id="lead">Agrégalo en la app y vean en vivo el avance del día de cada uno. Solo se comparte el % y los minutos, nunca las tareas.</p>
@@ -37,6 +36,14 @@
       </div>
       <p class="hint" id="hint">¿Aún no tienes la app? Descárgala, instálala y vuelve a abrir este enlace: MRitmo te llevará directo a agregarlo. <a href="/#instalar">Cómo instalar</a></p>
     </main>
+    <footer>
+      <nav aria-label="Información legal">
+        <a href="/privacidad/">Privacidad</a>
+        <a href="/terminos/">Términos</a>
+        <a href="/cookies/">Cookies</a>
+        <a href="mailto:soporte@mritmo.com">soporte@mritmo.com</a>
+      </nav>
+    </footer>
   </div>
   <script src="/sprites.js"></script>
   <script src="/site.js"></script>

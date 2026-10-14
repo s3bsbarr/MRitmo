@@ -31,6 +31,17 @@ jobs:
           python3 -m json.tool site/.well-known/assetlinks.json > /dev/null
           test -f site/index.html && test -f site/u/index.html && test -f site/.htaccess
 
+      # The site reads the latest APK's version, size and date from its own /version.json,
+      # so visitors never call GitHub's API. Build APK re-runs this flow after each release.
+      - name: Write version.json from the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases/latest" \
+            --jq '{version: (.tag_name | ltrimstr("v")), bytes: ([.assets[] | select(.name == "MRitmo.apk") | .size][0] // 0), published: .published_at}' \
+            > site/version.json || echo '{}' > site/version.json
+          cat site/version.json
+
       - name: Push site/ to the web branch
         run: |
           cd site

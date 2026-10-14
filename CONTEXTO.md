@@ -1,6 +1,6 @@
 # MRitmo — contexto del proyecto
 
-> Documento vivo. Se actualiza con cada versión. Última versión descrita: **1.8** (14 oct 2026).
+> Documento vivo. Se actualiza con cada versión. Última versión descrita: **1.8** (14 oct 2026), con la web legal y el consentimiento de cuenta del mismo día.
 > Repositorio: github.com/s3bsbarr/MRitmo · Descargas: pestaña Releases (v1.2, v1.3, v1.4…).
 
 ## 1. Qué es MRitmo
@@ -11,7 +11,7 @@ MRitmo es una app de productividad para Android que mide el día **en tiempo, no
 
 - **Inspiración:** Outdo (outdo.one): tareas con duración, progreso ponderado por tiempo y salas con ranking en vivo entre amigos.
 - **Dueño y único usuario por ahora:** Sebas (Bogotá). La prueba en un Samsung Galaxy S24, Android 16, One UI 8.5.
-- **Web y dominio (1.8):** mritmo.com (Hostinger): página de MRitmo con descarga e instalación, puente de invitación `mritmo.com/u/<usuario>` y correo `soporte@mritmo.com`.
+- **Web y dominio (1.8):** mritmo.com (Hostinger): página de MRitmo con descarga e instalación, puente de invitación `mritmo.com/u/<usuario>`, páginas legales (`/privacidad/`, `/terminos/`, `/cookies/`, `/reembolsos/`) y correo `soporte@mritmo.com`.
 - **Distribución actual:** APK firmado con llave propia, publicado en GitHub Releases (y en mritmo.com/descargar, que siempre apunta al último). Sin Play Store por ahora: la decisión es seguir con APK mientras haya cambios frecuentes y pasar a cuenta de desarrollador cuando salgan versiones semanales estables.
 - **Numeración:** versiones simples 1, 1.1, 1.2, 1.3, 1.4… Cada una se instala encima de la anterior.
 
@@ -41,6 +41,7 @@ MRitmo es una app de productividad para Android que mide el día **en tiempo, no
   - **50–99 %** — de pie, concentrado.
   - **100 %** — brazos arriba haciendo fuerza, sonrisa.
 - **Racha:** ícono de fuego en el color de la tinta (negro en claro, blanco en oscuro). Se usa para hábitos, para la racha de días completos de un amigo y para la racha compartida (con un ícono de personas al lado; el fuego se enciende solo cuando marcaron los dos).
+- **Web mritmo.com:** mismo lenguaje que la app, pero el modo claro es **crema suave** (`#f7f3ea` fondo, `#ece6da` superficies, tinta `#18160f`): prueba del crema antes de llevarlo (o no) a la app. Modo oscuro negro puro. Selector Sistema / Claro / Oscuro arriba a la derecha (se recuerda en `localStorage` `mritmo.theme`, sin parpadeo). Todos los textos cumplen contraste WCAG AA en ambos modos.
 - **Temporizador a pantalla completa (1.7):** siempre negro sobre blanco, también en modo oscuro, números lo más grandes que permita el ancho (Inter Bold, tracking negativo), botones píldora.
 
 ## 4. Funciones actuales (1.8)
@@ -55,6 +56,7 @@ MRitmo es una app de productividad para Android que mide el día **en tiempo, no
 - **Enlace de invitación (1.8):** `https://mritmo.com/u/<usuario>`. Con la app instalada abre MRitmo directo en **"Agregar a @usuario"** (Android App Link verificado con `assetlinks.json`); sin la app, abre la página puente con "Abrir en MRitmo" y "Descargar MRitmo". También funciona `ritmo://agregar/<usuario>`.
 - **Resumen:** barras de 7 días (planeado vs cumplido), tiempo cumplido, cumplimiento, días completos, estadísticas de hábitos (racha, mejor racha, constancia 30 días, últimos 7 días), compartir el día. Engranaje → Configuración.
 - **Configuración:** cuenta (crear, iniciar sesión, respaldar ahora, cerrar sesión), nombre, personaje, apariencia (sistema/claro/oscuro), notificaciones con hora editable, interruptores **Amigos** y **Hábitos juntos** (push del servidor, con diagnóstico en el subtítulo), aviso antes de tareas (no/5/10/15 min), temporizador en vivo (diagnóstico con la plantilla usada: números grandes o barra, + atajo a ajustes de Live Updates), ayuda de widgets. La versión del pie se lee de la configuración de la app.
+- **Crear cuenta (consentimiento, 14 oct 2026):** casilla obligatoria "Acepto los Términos y autorizo el tratamiento de mis datos según la Política de privacidad" con enlaces a mritmo.com; sin marcarla no se habilita "Crear cuenta". La prueba de la autorización (versión `LEGAL_VERSION` de `src/sync.ts` y fecha) queda en los metadatos del usuario de Supabase (`raw_user_meta_data.consent`). La cuenta sigue siendo opcional: sin cuenta no sale ningún dato del teléfono.
 - **Bienvenida (primer inicio):** cómo se mide el día, nombre, personaje. Enlace "¿Ya tienes cuenta? Inicia sesión".
 
 **Crear tarea / hábito**
@@ -103,7 +105,7 @@ MRitmo es una app de productividad para Android que mide el día **en tiempo, no
 - **Estado:** `src/data.ts` (modelo y funciones puras), `src/actions.ts` (acciones desde widgets/notificaciones), `src/effects.ts` (planificador de notificaciones locales, canales, temporizador, widgets), `src/sync.ts` (cuenta, respaldo, códigos de correo, nueva contraseña).
 - **Amigos:** `src/friends.ts` (datos, tiempo real, historial publicado, racha), `src/screens/Friends.tsx`, `src/components/FriendSheet.tsx`, `src/components/UsernameField.tsx`.
 - **Salas y ranking semanal (1.8):** `src/rooms.ts` (crear, invitar, unirse, salir, sacar, eliminar, ranking), `src/components/RoomSheet.tsx`, `src/components/BoardList.tsx` (lista de ranking con selector Hoy | Semana, compartida por Amigos y salas), `weekStartOf`/`weekOfMine` en `src/friends.ts`. Enlace: `inviteLink()` en `Friends.tsx`; `App.tsx` convierte `https://mritmo.com/u/<usuario>` en `ritmo://agregar/<usuario>`; `app.json` declara el App Link (`autoVerify`, host mritmo.com, `/u/`).
-- **Web (1.8):** `site/` (index, `u/index.html` puente, `.htaccess` con `/descargar` y la reescritura de `/u/<usuario>`, `.well-known/assetlinks.json` con la huella SHA-256 de la llave de firma). El flujo "Web (mritmo.com)" publica `site/` en la rama `web`; Hostinger (hPanel → mritmo.com → despliegue desde GitHub, app de GitHub de Hostinger) despliega esa rama en `public_html`. Cada release publica también `MRitmo.apk` con nombre fijo para `/descargar`.
+- **Web (1.8):** `site/` (index, `privacidad/`, `terminos/`, `cookies/`, `reembolsos/` (cada una `index.html`), `u/index.html` puente, `fonts/inter.woff2` + `OFL.txt` (Inter alojada en el propio dominio, sin Google Fonts), `site.js` (selector de tema, personaje, versión desde `/version.json`), `.htaccess` con `/descargar` y la reescritura de `/u/<usuario>`, `.well-known/assetlinks.json` con la huella SHA-256 de la llave de firma). El flujo "Web (mritmo.com)" publica `site/` en la rama `web`; Hostinger (hPanel → mritmo.com → despliegue desde GitHub, app de GitHub de Hostinger) despliega esa rama en `public_html`. Cada release publica también `MRitmo.apk` con nombre fijo para `/descargar`. **Sin terceros en la web:** ni cookies, ni analíticas, ni fuentes o scripts externos; la versión, tamaño y fecha del APK salen de `/version.json`, que escribe el flujo Web desde la última release (Build APK relanza el flujo Web al publicar), así los visitantes no llaman a la API de GitHub. `.htaccess` añade cabeceras de seguridad (CSP solo `self`, HSTS, nosniff, Referrer-Policy, Permissions-Policy, X-Frame-Options). El encabezado, el selector de tema y el pie están copiados en cada página (no hay plantillas): al cambiar uno, cambiar todos.
 - **Hábitos compartidos (1.7):** `src/shared.ts` (servidor, copia en el teléfono `ritmo.shared.v1`, cola de marcas sin conexión, racha compartida, tiempo real), hook `useShared` en `src/store.ts`, `src/components/SharedHabits.tsx` (sección de la hoja de amigo). Los botones de push (`ACCEPT_SHARED`, `CHECK_SHARED`) pasan por `applyAction` y funcionan con la app cerrada. `Snapshot.shared` hace que "Cierra tu día" cuente los compartidos pendientes.
 - **Temporizador a pantalla completa (1.7):** `src/components/FocusFull.tsx`, abierto desde `Focus` (`full`/`onFull` en `App.tsx`). El avance se publica solo, 1.5 s después de cada cambio: hoy (con foco) y los últimos 60 días, solo los días que cambiaron, en una sola petición.
 - **Push:** `src/push.ts` registra el token de Expo de cada teléfono en la cuenta (`register_push_token`), lo borra al cerrar sesión y guarda la preferencia en `notification_settings`. `app.config.js` añade `google-services.json` y el ID del proyecto de Expo solo en compilación.
@@ -147,7 +149,7 @@ Decisión del temporizador en vivo (13 oct 2026), tras investigar la documentaci
 
 Notas de diseño para las siguientes versiones:
 - Posibles mejoras de hábitos compartidos: recordatorio con hora (hoy solo los propios lo tienen; para los compartidos avisa el push del otro), estadísticas en Resumen, renombrar.
-- 1.9: eliminar cuenta = Edge Function con llave secreta que borra el usuario de `auth.users` (todo cae en cascada). Bloquear = tabla `blocks` y que `are_friends`/`push_enqueue` la respeten.
+- 1.9: eliminar cuenta = Edge Function con llave secreta que borra el usuario de `auth.users` (todo cae en cascada). **Ojo:** `rooms.owner` es `on delete cascade`, así que hoy borrar al dueño borra la sala de todos; antes de borrar, pasar sus salas al miembro más antiguo (como al salir). La política de privacidad (sección 7, ancla `#eliminar`) dice que hoy se pide por correo; cuando exista el botón, actualizarla. Bloquear = tabla `blocks` y que `are_friends`/`push_enqueue` la respeten.
 
 ### Dominio, web y correo (1.8, 14 oct 2026)
 - **Dominio:** mritmo.com comprado en Hostinger (octubre, por promoción, en vez de noviembre). Sitio PHP/HTML en el plan Premium de Hostinger (uno de los espacios libres). DNS en Hostinger (nameservers `dns-parking.com`), con CDN de Hostinger y SSL.
@@ -157,6 +159,14 @@ Notas de diseño para las siguientes versiones:
 - Problema encontrado y resuelto en la prueba: `SMTP_USER` seguía con hola@mritmo.com (de una sesión anterior) y Hostinger rechazaba el inicio de sesión (535). Se corrigió a soporte@ y `server.mjs` ya no le quita los espacios a la contraseña salvo con Gmail.
 - **DMARC (pendiente de Sebas, opcional):** hoy `v=DMARC1; p=none`. Como SPF y DKIM pasan alineados, conviene cambiarlo a `v=DMARC1; p=quarantine` en hPanel → Dominios → mritmo.com → DNS → registro TXT `_dmarc` → Editar (Claude no puede editar DNS).
 - El servidor de la app sigue en Supabase; Hostinger solo sirve páginas y correo.
+
+### Web legal y cumplimiento (14 oct 2026)
+- **Marco aplicado (Colombia):** Ley 1581 de 2012 y Decreto 1377 de 2013 (compilado en el Decreto 1074 de 2015) para datos personales; Ley 1480 de 2011 (Estatuto del Consumidor) para reembolsos y garantías. El proyecto de ley que reforma la 1581 (PLE 282 de 2026 Cámara) sigue en trámite: revisar si se aprueba (traería oficial de datos y reporte de incidentes más estricto).
+- **Páginas:** Política de privacidad (responsable, datos y finalidades, autorización, derechos, encargados y transmisión internacional, plazos de 10 y 15 días hábiles, menores, seguridad, vigencia), Términos (edad, instalación del APK, cuenta, qué ven otros, uso aceptable, propiedad intelectual "todos los derechos reservados", responsabilidad sin renunciar a la Ley 1480, ley colombiana y jueces de Bogotá), Cookies (no hay cookies; solo `mritmo.theme` en localStorage si el visitante elige tema; por eso **no hay banner de consentimiento**) y Reembolsos (app gratuita; si algún día hay pagos: retracto 5 días hábiles, art. 47, y reversión del pago, art. 51).
+- **Decisiones de Sebas:** código con **todos los derechos reservados** (el LICENSE decía "Copyright 650 Industries (Expo)", herencia de la plantilla; se reemplazó); **edad 18+, o menores con permiso del padre, madre o acudiente**.
+- **Registro Nacional de Bases de Datos (SIC):** no aplica: solo obliga a sociedades y entidades sin ánimo de lucro con activos de más de 100.000 UVT; las personas naturales están excluidas.
+- **Pendiente de Sebas:** el Decreto 1377 pide en la política nombre, domicilio, dirección, correo y teléfono del responsable. Hoy dice "persona natural con domicilio en Bogotá" + soporte@mritmo.com. Falta su **nombre completo**, una **dirección de correspondencia** y un **teléfono** (puede ser un número solo para MRitmo). Al tenerlos, añadirlos en la sección 1 de `site/privacidad/` y en la sección 1 de `site/terminos/`.
+- **Si cambian los términos o la privacidad en lo sustancial:** subir `LEGAL_VERSION` en `src/sync.ts`, cambiar la fecha/versión de las páginas y avisar en la app.
 
 ### Token de Supabase (14 oct 2026)
 - El secreto `SUPABASE_ACCESS_TOKEN` de GitHub quedó dañado ("JWT could not be decoded") y por eso falló el despliegue del servidor del commit de la 1.8 (salas sin aplicar en la base real).
@@ -192,6 +202,7 @@ Notas de diseño para las siguientes versiones:
 | 1.6 | 13 oct 2026 | Hoja de amigo (racha y 7 días), push del servidor (solicitud y aceptación) con interruptor, correo propio con plantillas en español y código de 6 dígitos, "Olvidé mi contraseña" con nueva contraseña en la app, amigo bot, servidor desplegado por GitHub Actions, arreglo del @usuario que duplicaba texto, cierre de un hueco que permitía fabricar amistades, tablas `habits`/`habit_checks` eliminadas. |
 | 1.7 | 13 oct 2026 | Hábitos compartidos con racha (invitar desde la hoja de amigo, en el Hoy de los dos, push de invitación / aceptación / "ya marcó, faltas tú" con botones Aceptar y Hecho, interruptor propio), temporizador en vivo con números grandes en Android 17 (MetricStyle) y pantalla completa negro sobre blanco al tocarlo, "Revisa tu correo" sin código mientras no haya correo propio (con "Abrir el correo"), la hoja de cuenta se cierra sola al abrir el enlace, el amigo bot acepta y marca hábitos. |
 | 1.8 | 14 oct 2026 | Salas con ranking propio (Hoy y Semana, invitar amigos, push con "Unirme"), ranking semanal en Amigos, enlace `mritmo.com/u/usuario` con Android App Links y "Agregar a @usuario", compartir usuario con el enlace, web mritmo.com en Hostinger (descarga, instalación, puente, assetlinks) desplegada desde la rama `web`, correo propio desde soporte@mritmo.com con código de 6 dígitos, token de Supabase rotado. |
+| 1.8 (web) | 14 oct 2026 | Web: modo claro crema con selector Sistema/Claro/Oscuro, páginas de privacidad, términos, cookies y reembolsos, Inter alojada en mritmo.com y versión del APK sin llamar a GitHub, accesibilidad (contraste AA, foco visible, saltar al contenido), cabeceras de seguridad. App: casilla de consentimiento al crear cuenta con prueba de la autorización (recompila la 1.8). LICENSE: todos los derechos reservados. |
 
 ## 8. Cómo trabaja Sebas en este proyecto
 

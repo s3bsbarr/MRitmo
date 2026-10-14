@@ -58,12 +58,23 @@ export async function getSession(): Promise<Session | null> {
   }
 }
 
+/**
+ * Version of mritmo.com/terminos and mritmo.com/privacidad the person accepts when
+ * creating an account. Bump it when either document changes in substance.
+ */
+export const LEGAL_VERSION = '2026-10-14';
+
 /** Returns 'signed-in' when the account is ready, or 'confirm' when an email confirmation is pending. */
 export async function signUp(email: string, password: string): Promise<'signed-in' | 'confirm'> {
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
-    options: { emailRedirectTo: AUTH_REDIRECT },
+    options: {
+      emailRedirectTo: AUTH_REDIRECT,
+      // Proof of the prior, express and informed authorization (Ley 1581 de 2012):
+      // what was accepted, which version and when. Stored with the account.
+      data: { consent: { terms: LEGAL_VERSION, privacy: LEGAL_VERSION, at: new Date().toISOString(), source: 'app' } },
+    },
   });
   if (error) throw error;
   // With email confirmation on, Supabase hides existing accounts behind an empty identities list.

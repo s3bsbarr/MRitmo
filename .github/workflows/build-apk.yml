@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: build-apk
@@ -146,3 +147,10 @@ jobs:
           files: dist/*.apk
           make_latest: true
           overwrite_files: true
+
+      # mritmo.com shows the version, size and date of the newest APK from its own
+      # /version.json (no GitHub calls from visitors), so refresh the site now.
+      - name: Refresh mritmo.com (version.json)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run web.yml --ref main || echo "No se pudo lanzar el flujo Web; córrelo a mano."
