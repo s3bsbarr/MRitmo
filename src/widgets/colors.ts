@@ -11,7 +11,7 @@ export type WC = {
   track: Hex;
 };
 
-export const W: { light: WC; dark: WC } = {
+export const W: { light: WC; dark: WC; cream: WC } = {
   light: {
     scheme: 'light',
     bg: '#FFFFFF',
@@ -31,6 +31,17 @@ export const W: { light: WC; dark: WC } = {
     text: '#F5F5F7',
     secondary: '#8E8E95',
     track: '#2A2A2E',
+  },
+  // "Crema (prueba)" (1.9): the cream of mritmo.com, only when picked in Configuración.
+  cream: {
+    scheme: 'light',
+    bg: '#F7F3EA',
+    surface: '#ECE6DA',
+    ink: '#18160F',
+    inkOnInk: '#F7F3EA',
+    text: '#18160F',
+    secondary: '#5E594D',
+    track: '#E2DBCC',
   },
 };
 

@@ -1,4 +1,5 @@
-/* MRitmo · mritmo.com — theme switch, the app's pixel character and the latest version.
+/* MRitmo · mritmo.com — theme switch, the app's pixel character, the latest version (and its
+   SHA-256), and a note for iPhones, where there is nothing to download.
    No cookies, no analytics, no third-party requests: the only thing stored is the theme
    the visitor picks (localStorage "mritmo.theme"), and it never leaves the browser. */
 (function () {
@@ -94,8 +95,34 @@
         for (var i = 0; i < spots.length; i++) {
           spots[i].textContent = ['Versión ' + rel.version, mb, when].filter(Boolean).join(' · ');
         }
+        // SHA-256 of the APK (1.9): short next to the button, full when opened, to compare.
+        if (rel.sha256 && /^[0-9a-f]{64}$/.test(rel.sha256)) {
+          var boxes = document.querySelectorAll('[data-sha]');
+          for (var j = 0; j < boxes.length; j++) {
+            var short = boxes[j].querySelector('[data-sha-short]');
+            var full = boxes[j].querySelector('[data-sha-full]');
+            if (short) short.textContent = rel.sha256.slice(0, 8) + '…' + rel.sha256.slice(-8);
+            if (full) full.textContent = rel.sha256;
+            boxes[j].hidden = false;
+          }
+        }
       })
       .catch(function () {});
+  }
+
+  // iPhone and iPad (1.9): MRitmo is Android only, so say so instead of offering an APK.
+  function isIOS() {
+    var ua = navigator.userAgent || '';
+    return /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  }
+
+  function platform() {
+    if (!isIOS()) return;
+    root.classList.add('ios');
+    var hide = document.querySelectorAll('[data-android-only]');
+    for (var i = 0; i < hide.length; i++) hide[i].hidden = true;
+    var show = document.querySelectorAll('[data-ios-note]');
+    for (var j = 0; j < show.length; j++) show[j].hidden = false;
   }
 
   var buttons = document.querySelectorAll('[data-set-theme]');
@@ -111,5 +138,6 @@
   }
 
   apply(stored());
+  platform();
   version();
 })();

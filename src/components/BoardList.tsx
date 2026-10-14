@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 import { Avatar } from '../avatar/Avatar';
 import { moodFor } from '../avatar/mood';
@@ -27,7 +28,15 @@ export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
         const pct = Math.round(r.ratio * 100);
         const inFocus = r.focusUntil !== null && r.focusUntil > now;
         const name = r.me ? 'Tú' : r.profile.display_name || `@${r.profile.username}`;
-        const minutes = r.total > 0 ? `${formatShort(r.done)} de ${formatShort(r.total)}${period === 'week' ? ' esta semana' : ''}` : period === 'week' ? 'Sin plan esta semana' : 'Sin plan todavía';
+        // 1.9: someone who hides their progress shows no numbers; you see yours, with a reminder.
+        const minutes = r.hidden
+          ? 'Avance oculto'
+          : r.total > 0
+            ? `${formatShort(r.done)} de ${formatShort(r.total)}${period === 'week' ? ' esta semana' : ''}`
+            : period === 'week'
+              ? 'Sin plan esta semana'
+              : 'Sin plan todavía';
+        const meHidden = r.me && Boolean(r.profile.hide_progress);
         return (
           <Press
             key={r.profile.id}
@@ -37,7 +46,11 @@ export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
             disabled={!onOpen && !onLongPress}
             scaleTo={0.99}
             accessibilityRole={onOpen ? 'button' : 'text'}
-            accessibilityLabel={`${name}, puesto ${i + 1}, ${pct} por ciento ${period === 'week' ? 'esta semana' : 'hoy'}${inFocus ? ', en foco' : ''}`}
+            accessibilityLabel={
+              r.hidden
+                ? `${name}, avance oculto`
+                : `${name}, puesto ${i + 1}, ${pct} por ciento ${period === 'week' ? 'esta semana' : 'hoy'}${inFocus ? ', en foco' : ''}${meHidden ? ', oculto para los demás' : ''}`
+            }
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -48,8 +61,8 @@ export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
               borderBottomColor: c.separator,
             }}
           >
-            <Text style={[type.headline, { color: c.textTertiary, width: 20, fontVariant: ['tabular-nums'] }]}>{i + 1}</Text>
-            <Avatar gender={r.profile.gender} mood={moodFor(r.ratio, r.total > 0)} px={2} still />
+            <Text style={[type.headline, { color: c.textTertiary, width: 20, fontVariant: ['tabular-nums'] }]}>{r.hidden ? '–' : i + 1}</Text>
+            <Avatar gender={r.profile.gender} mood={r.hidden ? 'calma' : moodFor(r.ratio, r.total > 0)} px={2} still />
             <View style={{ flex: 1 }}>
               <Text style={[type.body, { color: c.text, fontFamily: r.me ? font.semibold : font.regular }]} numberOfLines={1}>
                 {name}
@@ -57,12 +70,17 @@ export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
               <Text style={[type.footnote, { color: c.textSecondary, fontVariant: ['tabular-nums'] }]} numberOfLines={1}>
                 {minutes}
                 {inFocus ? '  ·  en foco' : ''}
+                {meHidden ? '  ·  oculto para los demás' : ''}
               </Text>
             </View>
-            <Text style={[type.title, { color: c.text, fontVariant: ['tabular-nums'] }]}>
-              {pct}
-              <Text style={[type.footnote, { color: c.textSecondary }]}> %</Text>
-            </Text>
+            {r.hidden ? (
+              <Ionicons name="eye-off-outline" size={20} color={c.textTertiary} />
+            ) : (
+              <Text style={[type.title, { color: c.text, fontVariant: ['tabular-nums'] }]}>
+                {pct}
+                <Text style={[type.footnote, { color: c.textSecondary }]}> %</Text>
+              </Text>
+            )}
           </Press>
         );
       })}

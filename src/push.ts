@@ -55,7 +55,10 @@ export async function registerPush(force = false): Promise<PushStatus> {
 
     const cached = await readCache();
     if (!force && cached && cached.userId === session.user.id && Date.now() - cached.at < REFRESH_MS) {
-      return { state: 'ready' };
+      // 1.9: the server can drop a token (Expo said it died, or another sign-out). Ask
+      // for this phone's row; if it's gone, register again instead of trusting the cache.
+      const { data, error } = await supabase.from('push_tokens').select('token').eq('token', cached.token).maybeSingle();
+      if (error || data) return { state: 'ready' };
     }
     const token = (await Notifications.getExpoPushTokenAsync({ projectId: pid })).data;
     const { error } = await supabase.rpc('register_push_token', { p_token: token, p_platform: Platform.OS });
@@ -76,6 +79,11 @@ export async function unregisterPush() {
   await AsyncStorage.removeItem(KEY).catch(() => {});
   if (!cached) return;
   await supabase.from('push_tokens').delete().eq('token', cached.token);
+}
+
+/** The account was deleted: its token row went with it, so only the local note remains. */
+export async function forgetPush() {
+  await AsyncStorage.removeItem(KEY).catch(() => {});
 }
 
 /** Tell the server which kinds you want. Keys: friends (1.6), habits (1.7). */

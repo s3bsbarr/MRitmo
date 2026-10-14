@@ -3,11 +3,22 @@
  * (minutes done / planned, and whether you are in focus right now); task
  * titles never leave your account. Row Level Security enforces it server-side.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { dayKey, Gender, progressOf, shiftDay, Task } from './data';
 import { getSession, supabase } from './sync';
 
-export type Profile = { id: string; username: string; display_name: string; gender: Gender };
+export type Profile = {
+  id: string;
+  username: string;
+  display_name: string;
+  gender: Gender;
+  /** They chose "Ocultar mi avance" (1.9): on boards without %, minutes or focus. */
+  hide_progress?: boolean;
+};
+
+/** Columns every profile read asks for. */
+export const PROFILE_COLUMNS = 'id, username, display_name, gender, hide_progress';
 
 export type BoardRow = {
   profile: Profile;
@@ -16,6 +27,8 @@ export type BoardRow = {
   total: number;
   ratio: number;
   focusUntil: number | null;
+  /** Someone else who hides their progress (1.9): shown without numbers, at the bottom. */
+  hidden: boolean;
 };
 
 export type FriendsState = {
@@ -69,11 +82,14 @@ export function rankRows(
     const v = period === 'day' ? t : (week ?? { done: 0, total: 0 });
     return { done: v.done, total: v.total, focusUntil: t.focusUntil, ratio: v.total ? Math.min(1, v.done / v.total) : 0 };
   };
+  const hiddenRow = { done: 0, total: 0, focusUntil: null, ratio: 0, hidden: true };
   const rows: BoardRow[] = [
-    { profile: me, me: true, ...pick(mine.today, mine.week) },
-    ...people.filter((p) => p.id !== me.id).map((p) => ({ profile: p, me: false, ...pick(progress.today[p.id], progress.week[p.id]) })),
+    { profile: me, me: true, hidden: false, ...pick(mine.today, mine.week) },
+    ...people
+      .filter((p) => p.id !== me.id)
+      .map((p) => (p.hide_progress ? { profile: p, me: false, ...hiddenRow } : { profile: p, me: false, hidden: false, ...pick(progress.today[p.id], progress.week[p.id]) })),
   ];
-  return rows.sort((a, b) => b.ratio - a.ratio || b.done - a.done || Number(b.me) - Number(a.me));
+  return rows.sort((a, b) => Number(a.hidden) - Number(b.hidden) || b.ratio - a.ratio || b.done - a.done || Number(b.me) - Number(a.me));
 }
 
 export const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
@@ -96,7 +112,7 @@ async function myId() {
 export async function getMyProfile(): Promise<Profile | null> {
   const id = await myId();
   if (!id) return null;
-  const { data, error } = await supabase.from('profiles').select('id, username, display_name, gender').eq('id', id).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', id).maybeSingle();
   if (error) fail(error, 'No se pudo cargar tu perfil.');
   return (data as Profile) ?? null;
 }
@@ -125,6 +141,9 @@ export async function sendRequest(raw: string) {
   if (error) fail(error, 'No se pudo buscar ese usuario.');
   if (!target) throw new Error(`No existe @${username}.`);
   if (target.id === id) throw new Error('Ese eres tú.');
+  // You blocked them (1.9): unblock first, or the database silently drops the request.
+  const { data: blocked } = await supabase.from('blocks').select('blocked').eq('blocker', id).eq('blocked', target.id).maybeSingle();
+  if (blocked) throw new Error(`Bloqueaste a @${username}. Desbloquéalo en Configuración → Privacidad para agregarlo.`);
 
   // If they already asked you, adding them back accepts it.
   const { data: reverse } = await supabase
@@ -175,7 +194,7 @@ export async function loadFriends(): Promise<FriendsState> {
   const ids = [...new Set([...friendIds, ...incomingIds, ...outgoingIds])];
   const profiles: Record<string, Profile> = {};
   if (ids.length) {
-    const { data } = await supabase.from('profiles').select('id, username, display_name, gender').in('id', ids);
+    const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).in('id', ids);
     for (const p of (data ?? []) as Profile[]) profiles[p.id] = p;
   }
 
@@ -317,6 +336,41 @@ export async function publishProgress(today: { done: number; total: number; focu
   // Fails until a username exists (rows belong to a profile); the next call retries.
   if (!error) for (const { day, key } of changed) published.set(day, key);
 }
+
+/* ─── Offline (1.9) ─────────────────────────────────────────────────────────
+ * The last board that loaded, kept on the phone: without a connection the
+ * Amigos tab shows it (marked as not live) instead of an empty screen. */
+
+const CACHE_KEY = 'ritmo.friends.v1';
+
+export type FriendsCache<R = unknown, P = unknown> = { userId: string; at: number; day: string; st: FriendsState; rooms: R; roomProgress: P };
+
+export async function saveFriendsCache<R, P>(st: FriendsState, rooms: R, roomProgress: P) {
+  const id = await myId();
+  if (!id || !st.me) return;
+  const c: FriendsCache<R, P> = { userId: id, at: Date.now(), day: dayKey(), st, rooms, roomProgress };
+  await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(c)).catch(() => {});
+}
+
+export async function loadFriendsCache<R, P>(): Promise<FriendsCache<R, P> | null> {
+  try {
+    const id = await myId();
+    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    const c = raw ? (JSON.parse(raw) as FriendsCache<R, P>) : null;
+    if (!c || c.userId !== id) return null;
+    // Yesterday's numbers aren't today's: keep the people, drop the day's progress.
+    if (c.day !== dayKey()) c.st = { ...c.st, progress: {} };
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearFriendsCache() {
+  await AsyncStorage.removeItem(CACHE_KEY).catch(() => {});
+}
+
+export const isOfflineError = (message: string | null | undefined) => Boolean(message && /sin conexión|network|fetch/i.test(message));
 
 /** Live board: any friend's progress change or a new request triggers a reload. */
 export function subscribeFriends(onChange: () => void): () => void {

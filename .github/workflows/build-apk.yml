@@ -13,6 +13,10 @@ on:
       - '.github/workflows/web.yml'
       - 'site/**'
       - 'tools/site-sprites.mjs'
+      - 'tools/web-build.mjs'
+      - 'tools/site-pages.py'
+      - 'tools/og-image.py'
+      - 'tools/pages/**'
   workflow_dispatch:
 
 permissions:

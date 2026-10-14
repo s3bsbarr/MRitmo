@@ -84,7 +84,7 @@ export function Avatar({
   still?: boolean;
 }) {
   const { c } = useTheme();
-  const palette = SPRITE_COLORS[c.scheme] as Record<string, string>;
+  const palette = c.sprite ?? (SPRITE_COLORS[c.scheme] as Record<string, string>);
   const reduced = useReducedMotion();
   const [smiling, setSmiling] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);

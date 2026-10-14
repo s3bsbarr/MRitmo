@@ -30,6 +30,8 @@ type Props = {
   onConfirm: (r: ConfirmRequest) => void;
   onActions: (r: ItemActions) => void;
   onEdit: (e: Editing) => void;
+  /** Shown under the header: "MRitmo X está disponible" (1.9). */
+  banner?: React.ReactNode;
 };
 
 function SectionHeader({ title, count }: { title: string; count?: string }) {
@@ -42,7 +44,7 @@ function SectionHeader({ title, count }: { title: string; count?: string }) {
   );
 }
 
-export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus, onConfirm, onActions, onEdit }: Props) {
+export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus, onConfirm, onActions, onEdit, banner }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { todayTasks, carryover, upcoming } = api;
@@ -135,6 +137,8 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
         </View>
         <Avatar gender={gender} mood={mood} px={4} interactive />
       </View>
+
+      {banner}
 
       {todayTasks.length > 0 && (
         <View style={{ marginTop: space.xxl }}>

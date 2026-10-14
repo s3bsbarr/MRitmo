@@ -107,6 +107,33 @@ export async function signOut() {
   await supabase.auth.signOut().catch(() => {});
 }
 
+/**
+ * Delete the account and everything on the server (1.9). Runs the Edge Function
+ * delete-account with your own session: rooms you own pass to their oldest
+ * member, the rest goes in cascade. What is on this phone stays until the
+ * caller clears it. `confirm` is the word the person typed ("ELIMINAR").
+ */
+export async function deleteAccount(confirm: string) {
+  const session = await getSession();
+  if (!session) throw new Error('Inicia sesión primero.');
+  const { error } = await supabase.functions.invoke('delete-account', { body: { confirm } });
+  if (!error) return;
+  // FunctionsHttpError carries the response: show the function's own message when there is one.
+  const ctx = (error as { context?: Response }).context;
+  let message = '';
+  try {
+    message = String(((await ctx?.json?.()) as { error?: string } | undefined)?.error ?? '');
+  } catch {}
+  if (message) throw new Error(message);
+  if (/fetch|network|relay|failed to send/i.test(error.message)) throw new Error('Sin conexión. Revisa tu internet e inténtalo de nuevo.');
+  throw new Error('No se pudo eliminar la cuenta. Inténtalo de nuevo en un momento.');
+}
+
+/** After the account is gone: drop the local session without calling the server. */
+export async function forgetSession() {
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+}
+
 export async function resetPassword(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: AUTH_REDIRECT });
   if (error) throw error;

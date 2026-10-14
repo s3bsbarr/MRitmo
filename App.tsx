@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Linking, Platform, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,25 +13,33 @@ import { ActionsSheet, ItemActions } from './src/components/ActionsSheet';
 import { AddSheet, Editing, NewItem } from './src/components/AddSheet';
 import { AuthSheet, AuthStep } from './src/components/AuthSheet';
 import { ConfirmRequest, ConfirmSheet } from './src/components/ConfirmSheet';
+import { DeleteAccountSheet } from './src/components/DeleteAccountSheet';
+import { UpdateBanner } from './src/components/UpdateBanner';
 import { BlurTargetContext } from './src/components/Glass';
 import { NavBar, Tab } from './src/components/NavBar';
 import { defaultSettings, emptyFocus, FocusState, loadFocus, loadMeta, loadSettings, progressOf, saveFocus, saveSettings, Settings, ThemePref } from './src/data';
 import { configureNotifications, onAppBackground, onAppForeground, requestNotificationPermission } from './src/effects';
 import { Focus } from './src/screens/Focus';
 import { Friends } from './src/screens/Friends';
-import { historyOf, publishProgress, syncProfile } from './src/friends';
-import { PushStatus, registerPush, savePushPrefs, unregisterPush } from './src/push';
+import { clearFriendsCache, getMyProfile, historyOf, publishProgress, syncProfile } from './src/friends';
+import { forgetPush, PushStatus, registerPush, savePushPrefs, unregisterPush } from './src/push';
+import { countOwnedRooms } from './src/rooms';
+import { Onboarding } from './src/screens/Onboarding';
+import { cachedUpdate, checkForUpdate, dismissUpdate, UpdateInfo } from './src/update';
 import { AccountInfo, SettingsScreen } from './src/screens/Settings';
 import { Summary } from './src/screens/Summary';
 import { Today } from './src/screens/Today';
 import { Welcome } from './src/screens/Welcome';
 import { clearSharedCache } from './src/shared';
 import { useHabits, useShared, useTasks } from './src/store';
-import { getSession, handleAuthUrl, scheduleSync, signOut, supabase, syncNow } from './src/sync';
+import { deleteAccount, forgetSession, getSession, handleAuthUrl, scheduleSync, signOut, supabase, syncNow } from './src/sync';
 import { palettes, ThemeContext } from './src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 configureNotifications();
+
+/** Post-signup steps (1.9) done or skipped, per account. */
+const onboardKey = (userId: string) => `ritmo.onboard.v1.${userId}`;
 
 export default function App() {
   const [fontsLoaded] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
@@ -57,6 +66,14 @@ export default function App() {
   const [openRoomId, setOpenRoomId] = useState<string | null>(null);
   const [addUsername, setAddUsername] = useState<string | null>(null);
   const sharedApi = useShared(Boolean(account.email));
+  // 1.9: post-signup onboarding, delete account, new-version notice, reloads.
+  const [onboarding, setOnboarding] = useState<{ userId: string; username: string | null } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [ownedRooms, setOwnedRooms] = useState(0);
+  const [release, setRelease] = useState<UpdateInfo | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  /** The last invitation link (mritmo.com/u/<usuario>), offered again in onboarding. */
+  const lastInvite = useRef<string | null>(null);
 
   const snapRef = useRef({ tasks: api.tasks, habits: habitsApi.habits, focus, settings, shared: sharedApi.active });
   snapRef.current = { tasks: api.tasks, habits: habitsApi.habits, focus, settings, shared: sharedApi.active };
@@ -77,7 +94,8 @@ export default function App() {
     if (!ready) return;
     const id = setTimeout(() => resyncAll(snapRef.current), 450);
     return () => clearTimeout(id);
-  }, [ready, api.tasks, habitsApi.habits, focus, settings, sharedApi.active]);
+    // api.today: at midnight, re-plan notifications and redraw widgets for the new day (1.9).
+  }, [ready, api.tasks, habitsApi.habits, focus, settings, sharedApi.active, api.today]);
 
   const setFocus = useCallback((f: FocusState) => {
     setFocusState(f);
@@ -171,6 +189,40 @@ export default function App() {
     syncProfile(settings.name, settings.gender).catch(() => {});
   }, [ready, account.email, settings.name, settings.gender]);
 
+  // Right after an account appears (1.9): a new one without a username gets the
+  // three onboarding steps; an existing one just gets the notification prompt.
+  useEffect(() => {
+    if (!ready || !account.email) {
+      setOnboarding(null);
+      return;
+    }
+    let live = true;
+    (async () => {
+      const session = await getSession();
+      if (!session || !live) return;
+      const key = onboardKey(session.user.id);
+      if (await AsyncStorage.getItem(key).catch(() => null)) return;
+      const profile = await getMyProfile().catch(() => undefined);
+      if (!live || profile === undefined) return; // offline: ask again next time
+      if (profile) {
+        await AsyncStorage.setItem(key, 'existing').catch(() => {});
+        requestNotificationPermission();
+        return;
+      }
+      setOnboarding({ userId: session.user.id, username: null });
+    })();
+    return () => {
+      live = false;
+    };
+  }, [ready, account.email]);
+
+  // A newer MRitmo on mritmo.com (1.9): what we knew, then ask (at most every few hours).
+  useEffect(() => {
+    if (!ready) return;
+    cachedUpdate().then(setRelease);
+    checkForUpdate().then(setRelease);
+  }, [ready]);
+
   // Back up a few seconds after any change, when signed in.
   useEffect(() => {
     if (!ready || !account.email) return;
@@ -184,6 +236,8 @@ export default function App() {
       if (state === 'active') {
         await onAppForeground();
         await reloadAll();
+        checkForUpdate().then(setRelease);
+        setReloadKey((k) => k + 1);
         if (await getSession()) {
           runSync();
           refreshPush();
@@ -212,7 +266,7 @@ export default function App() {
           setAuthMode(null);
           setAuthStep('form');
           setAuthError(null);
-          requestNotificationPermission();
+          // Notifications are asked for by onboarding (new accounts) or right after it's skipped.
           return;
         }
         setShowSettings(false);
@@ -237,6 +291,7 @@ export default function App() {
     }
     else if (path === 'agregar' && param) {
       setTab('amigos');
+      lastInvite.current = decodeURIComponent(param);
       setAddUsername(decodeURIComponent(param));
     } else if (path === 'salas' && param && /^[0-9a-f-]{36}$/i.test(param)) {
       setTab('amigos');
@@ -273,8 +328,9 @@ export default function App() {
     };
   }, [route, reloadAll]);
 
-  const scheme = settings.theme === 'system' ? (system === 'dark' ? 'dark' : 'light') : settings.theme;
-  const c = palettes[scheme];
+  // "Crema (prueba)" is a light scheme with its own colors (1.9, only for trying it out).
+  const scheme = settings.theme === 'system' ? (system === 'dark' ? 'dark' : 'light') : settings.theme === 'cream' ? 'light' : settings.theme;
+  const c = settings.theme === 'cream' ? palettes.cream : palettes[scheme];
 
   const theme = useMemo(
     () => ({ c, pref: settings.theme, setPref: (p: ThemePref) => update({ theme: p }) }),
@@ -323,10 +379,7 @@ export default function App() {
             initialStep={authStep}
             initialError={authError}
             onClose={closeAuth}
-            onSignedIn={async () => {
-              await runSync();
-              requestNotificationPermission();
-            }}
+            onSignedIn={runSync}
           />
           <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         </ThemeContext.Provider>
@@ -355,6 +408,7 @@ export default function App() {
                     setEditing(e);
                     setAdding(true);
                   }}
+                  banner={<UpdateBanner update={release} onDismiss={(v) => dismissUpdate(v).then(setRelease)} />}
                 />
               )}
               {tab === 'foco' && <Focus api={api} focus={focus} setFocus={setFocus} full={focusFull} onFull={setFocusFull} />}
@@ -375,11 +429,13 @@ export default function App() {
                   onRoomOpened={() => setOpenRoomId(null)}
                   addUsername={addUsername}
                   onAddHandled={() => setAddUsername(null)}
+                  today={api.today}
+                  reloadKey={reloadKey}
                 />
               )}
               {tab === 'resumen' && <Summary api={api} habits={habitsApi.habits} name={settings.name} onOpenSettings={() => setShowSettings(true)} />}
             </BlurTargetView>
-            {!showSettings && (
+            {!showSettings && !onboarding && (
               <NavBar
                 tab={tab}
                 onTab={setTab}
@@ -408,6 +464,7 @@ export default function App() {
                         await unregisterPush().catch(() => {});
                         await signOut();
                         await clearSharedCache();
+                        await clearFriendsCache();
                         setAccount({ email: null, syncing: false });
                       },
                     })
@@ -415,6 +472,33 @@ export default function App() {
                   onSyncNow={runSync}
                   push={push}
                   onPushRetry={() => refreshPush(true)}
+                  onDeleteAccount={() => {
+                    countOwnedRooms().then(setOwnedRooms).catch(() => {});
+                    setDeleting(true);
+                  }}
+                  release={release}
+                  onCheckUpdate={async () => setRelease(await checkForUpdate(true))}
+                  onPrivacyChanged={() => setReloadKey((k) => k + 1)}
+                />
+              </View>
+            )}
+            {onboarding && (
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                <Onboarding
+                  name={settings.name}
+                  gender={settings.gender}
+                  username={onboarding.username}
+                  invitedBy={lastInvite.current}
+                  onProfileReady={() => {
+                    publishProgress(mine, history);
+                    setReloadKey((k) => k + 1);
+                  }}
+                  onDone={(toFriends) => {
+                    AsyncStorage.setItem(onboardKey(onboarding.userId), 'done').catch(() => {});
+                    setOnboarding(null);
+                    setReloadKey((k) => k + 1);
+                    if (toFriends) setTab('amigos');
+                  }}
                 />
               </View>
             )}
@@ -433,6 +517,23 @@ export default function App() {
             />
             <ActionsSheet request={actions} onClose={() => setActions(null)} />
             <ConfirmSheet request={confirm} onClose={() => setConfirm(null)} />
+            <DeleteAccountSheet
+              visible={deleting}
+              email={account.email}
+              ownsRooms={ownedRooms}
+              onClose={() => setDeleting(false)}
+              onDelete={async (word) => {
+                const session = await getSession();
+                await deleteAccount(word);
+                // The server is clean; now this phone forgets the account (its tasks stay).
+                await forgetPush();
+                await forgetSession();
+                await clearSharedCache();
+                await clearFriendsCache();
+                if (session) await AsyncStorage.removeItem(onboardKey(session.user.id)).catch(() => {});
+                setAccount({ email: null, syncing: false });
+              }}
+            />
             <AuthSheet
               visible={authMode !== null}
               initialMode={authMode ?? 'signup'}

@@ -167,3 +167,27 @@ footer p { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
 
 ol.steps p a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* 1.9 · Download meta (version + SHA-256), iPhone note, release notes, help. */
+[hidden] { display: none !important; }
+.cta .meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+details.sha { font-size: 14px; color: var(--text-3); }
+details.sha summary { cursor: pointer; list-style: none; display: inline-flex; gap: 6px; align-items: baseline; }
+details.sha summary::-webkit-details-marker { display: none; }
+details.sha summary::after { content: '+'; font-weight: 600; color: var(--text-2); }
+details.sha[open] summary::after { content: '−'; }
+details.sha code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; color: var(--text-2); }
+details.sha .full { display: block; margin: 6px 0 4px; word-break: break-all; background: var(--surface); border-radius: 10px; padding: 8px 10px; color: var(--text); user-select: all; }
+details.sha a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+.ios-note { display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border-radius: var(--radius); padding: 18px 20px; margin: 28px 0 8px; max-width: 520px; }
+.ios-note svg { width: 26px; height: 26px; flex: none; margin-top: 2px; }
+.ios-note p { margin: 4px 0 0; color: var(--text-2); font-size: 16px; }
+.doc code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.9em; background: var(--surface); border-radius: 6px; padding: 1px 6px; }
+.doc .toc { columns: 2 220px; column-gap: 24px; margin: 0; padding-left: 18px; }
+.doc .toc li { break-inside: avoid; }
+.release { padding: 22px 0 6px; border-bottom: 1px solid var(--line); }
+.release:last-of-type { border-bottom: 0; }
+.release h2 { margin: 0 0 2px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.release .tag { font-size: 13px; letter-spacing: 0; font-weight: 600; background: var(--ink); color: var(--on-ink); border-radius: 999px; padding: 3px 10px; }
+.release .when { color: var(--text-3); font-size: 14px; margin-bottom: 8px; }
+.release > p:not(.when) { font-weight: 600; }

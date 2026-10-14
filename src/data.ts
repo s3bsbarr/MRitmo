@@ -39,7 +39,7 @@ export type FocusState = {
   started?: boolean;
 };
 
-export type ThemePref = 'system' | 'light' | 'dark';
+export type ThemePref = 'system' | 'light' | 'dark' | 'cream';
 export type Gender = 'm' | 'f';
 
 export type Settings = {

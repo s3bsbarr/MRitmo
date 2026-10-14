@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from '../haptics';
 import { useEffect, useState } from 'react';
-import { Linking, Platform, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../avatar/Avatar';
 import { Press } from '../components/Press';
@@ -14,6 +14,9 @@ import { font, radius, space, type, useTheme } from '../theme';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { PushStatus, pushStatusLabel } from '../push';
+import { BlockedPerson, loadBlocked, loadHideProgress, setHideProgress, unblockUser } from '../privacy';
+import { currentVersion, UpdateInfo } from '../update';
+import { openDownload, openNews } from '../components/UpdateBanner';
 
 export type AccountInfo = {
   email: string | null;
@@ -32,6 +35,13 @@ type Props = {
   onSyncNow: () => void;
   push: PushStatus;
   onPushRetry: () => void;
+  /** Opens "¿Eliminar tu cuenta?" (1.9). */
+  onDeleteAccount: () => void;
+  /** Newest version on mritmo.com (1.9). */
+  release: UpdateInfo | null;
+  onCheckUpdate: () => Promise<void>;
+  /** Blocking or unblocking changed who's on the boards. */
+  onPrivacyChanged?: () => void;
 };
 
 function ago(ms?: number) {
@@ -211,7 +221,188 @@ function ToggleRow({ label, detail, value, onChange, last }: { label: string; de
   );
 }
 
-export function SettingsScreen({ settings, update, onClose, account, onAuth, onSignOut, onSyncNow, push, onPushRetry }: Props) {
+/** Ocultar mi avance and Bloqueados (1.9). Loads on its own; needs an account with a username. */
+function PrivacySection({ signedIn, onChanged }: { signedIn: boolean; onChanged?: () => void }) {
+  const { c } = useTheme();
+  const [hide, setHide] = useState<boolean | null>(null);
+  const [blocked, setBlocked] = useState<BlockedPerson[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    let live = true;
+    Promise.all([loadHideProgress(), loadBlocked()])
+      .then(([h, b]) => {
+        if (!live) return;
+        setHide(h);
+        setBlocked(b);
+        setError(null);
+      })
+      .catch((e) => live && setError((e as Error).message))
+      .finally(() => live && setLoaded(true));
+    return () => {
+      live = false;
+    };
+  }, [signedIn]);
+
+  if (!signedIn) return null;
+
+  const toggle = async (v: boolean) => {
+    const before = hide;
+    setHide(v);
+    try {
+      await setHideProgress(v);
+      setError(null);
+      onChanged?.();
+    } catch (e) {
+      setHide(before);
+      setError((e as Error).message);
+    }
+  };
+
+  const unblock = async (p: BlockedPerson) => {
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      await unblockUser(p.id);
+      setBlocked((prev) => (prev ?? []).filter((x) => x.id !== p.id));
+      onChanged?.();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  const noProfile = loaded && hide === null && !error;
+  return (
+    <Section
+      title="Privacidad"
+      note={
+        error ??
+        (noProfile
+          ? 'Elige tu @usuario en la pestaña Amigos para usar estos controles.'
+          : 'Para bloquear a alguien, tócalo en el ranking de Amigos (o mantén presionada su solicitud) y elige Bloquear. No le avisamos.')
+      }
+    >
+      <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+        <ToggleRow
+          label="Ocultar mi avance"
+          detail={hide ? 'Tus amigos y salas te ven sin % ni minutos' : 'Tus amigos y salas ven tu % y tus minutos'}
+          value={Boolean(hide)}
+          onChange={toggle}
+          last={!blocked || blocked.length === 0}
+        />
+        {blocked && blocked.length > 0 && (
+          <>
+            <Text style={[type.footnote, { color: c.textSecondary, paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.xs }]}>Bloqueados</Text>
+            {blocked.map((p, i) => (
+              <View
+                key={p.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  minHeight: 56,
+                  marginLeft: space.lg,
+                  paddingRight: space.md,
+                  gap: space.md,
+                  borderBottomWidth: i === blocked.length - 1 ? 0 : 1,
+                  borderBottomColor: c.separator,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.body, { color: c.text }]} numberOfLines={1}>{p.display_name || `@${p.username}`}</Text>
+                  <Text style={[type.footnote, { color: c.textSecondary }]}>@{p.username}</Text>
+                </View>
+                <Press
+                  onPress={() => unblock(p)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Desbloquear a @${p.username}`}
+                  style={{ height: 34, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: c.bg, justifyContent: 'center' }}
+                >
+                  <Text style={[type.footnote, { color: c.text, fontFamily: font.semibold }]}>Desbloquear</Text>
+                </Press>
+              </View>
+            ))}
+          </>
+        )}
+      </View>
+    </Section>
+  );
+}
+
+/** "Tienes la última versión" or "MRitmo X está disponible" (1.9). */
+function UpdateSection({ update, onCheck }: { update: UpdateInfo | null; onCheck: () => Promise<void> }) {
+  const { c } = useTheme();
+  const [checking, setChecking] = useState(false);
+  const r = update?.release;
+  const check = async () => {
+    setChecking(true);
+    await onCheck().catch(() => {});
+    setChecking(false);
+  };
+  const mb = r?.bytes ? ` · ${Math.round(r.bytes / 1048576)} MB` : '';
+  return (
+    <Section
+      title="Versión"
+      note={update?.available ? 'Se descarga desde mritmo.com y se instala encima de esta: no pierdes nada.' : 'MRitmo revisa mritmo.com cada pocas horas. Si hay una versión nueva, te la muestra en Hoy.'}
+    >
+      <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 60, paddingHorizontal: space.lg, gap: space.md, borderBottomWidth: 1, borderBottomColor: c.separator }}>
+          <Ionicons name={update?.available ? 'arrow-down-circle-outline' : 'checkmark-circle-outline'} size={22} color={c.text} />
+          <View style={{ flex: 1 }}>
+            <Text style={[type.body, { color: c.text }]}>{update?.available && r ? `MRitmo ${r.version} está disponible` : `MRitmo ${currentVersion()}`}</Text>
+            <Text style={[type.footnote, { color: c.textSecondary }]}>
+              {update?.available && r ? (r.title ?? 'Hay una versión nueva') : update?.release ? 'Tienes la última versión' : 'Aún no se ha revisado'}
+            </Text>
+          </View>
+          {update?.available ? (
+            <Press
+              onPress={openDownload}
+              accessibilityRole="button"
+              style={{ height: 36, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: c.ink, justifyContent: 'center' }}
+            >
+              <Text style={[type.callout, { color: c.inkOnInk, fontFamily: font.semibold }]}>Descargar{mb}</Text>
+            </Press>
+          ) : (
+            <Press onPress={check} disabled={checking} accessibilityRole="button" style={{ height: 36, paddingHorizontal: space.md, justifyContent: 'center' }}>
+              {checking ? <ActivityIndicator color={c.textSecondary} /> : <Text style={[type.callout, { color: c.text }]}>Buscar</Text>}
+            </Press>
+          )}
+        </View>
+        <Press onPress={() => openNews(update?.available ? r : null)} scaleTo={0.99} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md }}>
+          <Ionicons name="sparkles-outline" size={20} color={c.text} />
+          <Text style={[type.body, { color: c.text, flex: 1 }]}>Novedades de cada versión</Text>
+          <Ionicons name="open-outline" size={18} color={c.textTertiary} />
+        </Press>
+        <Press
+          onPress={() => Linking.openURL('https://mritmo.com/ayuda/').catch(() => {})}
+          scaleTo={0.99}
+          accessibilityRole="link"
+          style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md, borderTopWidth: 1, borderTopColor: c.separator }}
+        >
+          <Ionicons name="help-circle-outline" size={20} color={c.text} />
+          <Text style={[type.body, { color: c.text, flex: 1 }]}>Ayuda</Text>
+          <Ionicons name="open-outline" size={18} color={c.textTertiary} />
+        </Press>
+      </View>
+    </Section>
+  );
+}
+
+export function SettingsScreen({
+  settings,
+  update,
+  onClose,
+  account,
+  onAuth,
+  onSignOut,
+  onSyncNow,
+  push,
+  onPushRetry,
+  onDeleteAccount,
+  release,
+  onCheckUpdate,
+  onPrivacyChanged,
+}: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState(settings.name);
@@ -270,7 +461,11 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
           title="Cuenta"
           note={
             account.email
-              ? account.error ?? `Respaldo ${account.syncing ? 'en curso…' : ago(account.lastSync)}. Se respalda solo después de cada cambio.`
+              ? account.error
+                ? /sin conexión/i.test(account.error)
+                  ? `Sin conexión. Tus cambios quedan en este teléfono y se respaldan solos al volver la conexión. Último respaldo: ${ago(account.lastSync)}.`
+                  : account.error
+                : `Respaldo ${account.syncing ? 'en curso…' : ago(account.lastSync)}. Se respalda solo después de cada cambio.`
               : 'Sin cuenta, tus datos viven solo en este teléfono. Con cuenta, al reinstalar o cambiar de teléfono vuelve todo.'
           }
         >
@@ -287,9 +482,16 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
                 <Ionicons name="cloud-upload-outline" size={20} color={c.text} />
                 <Text style={[type.body, { color: c.text, flex: 1 }]}>{account.syncing ? 'Respaldando…' : 'Respaldar ahora'}</Text>
               </Press>
-              <Press onPress={onSignOut} scaleTo={0.99} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md }}>
-                <Ionicons name="log-out-outline" size={20} color={c.danger} />
-                <Text style={[type.body, { color: c.danger }]}>Cerrar sesión</Text>
+              <Press onPress={onSignOut} scaleTo={0.99} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md, borderBottomWidth: 1, borderBottomColor: c.separator }}>
+                <Ionicons name="log-out-outline" size={20} color={c.text} />
+                <Text style={[type.body, { color: c.text }]}>Cerrar sesión</Text>
+              </Press>
+              <Press onPress={onDeleteAccount} scaleTo={0.99} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.lg, gap: space.md }}>
+                <Ionicons name="trash-outline" size={20} color={c.danger} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.body, { color: c.danger }]}>Eliminar cuenta</Text>
+                  <Text style={[type.footnote, { color: c.textSecondary }]}>Borra tu cuenta y tus datos del servidor</Text>
+                </View>
               </Press>
             </View>
           ) : (
@@ -403,7 +605,44 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
               );
             })}
           </View>
+          {/* 1.9: a test theme, not an official one. It reads as a test on purpose. */}
+          <Press
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              update({ theme: settings.theme === 'cream' ? 'system' : 'cream' });
+            }}
+            scaleTo={0.99}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: settings.theme === 'cream' }}
+            accessibilityLabel="Crema, tema de prueba"
+            style={{
+              marginTop: space.sm,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space.md,
+              minHeight: 56,
+              paddingHorizontal: space.lg,
+              borderRadius: radius.md,
+              borderWidth: 1.5,
+              borderStyle: 'dashed',
+              borderColor: settings.theme === 'cream' ? c.ink : c.separator,
+            }}
+          >
+            <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#F7F3EA', borderWidth: 1, borderColor: 'rgba(24,22,15,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#18160F' }} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.body, { color: c.text }]}>Crema (prueba)</Text>
+              <Text style={[type.footnote, { color: c.textSecondary }]}>El color de mritmo.com. No es oficial, puede cambiar.</Text>
+            </View>
+            <View style={{ paddingHorizontal: 8, height: 22, borderRadius: radius.pill, borderWidth: 1, borderColor: c.textSecondary, justifyContent: 'center' }}>
+              <Text style={[type.caption, { color: c.textSecondary, fontFamily: font.semibold, letterSpacing: 0.6 }]}>PRUEBA</Text>
+            </View>
+            <Ionicons name={settings.theme === 'cream' ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={settings.theme === 'cream' ? c.ink : c.textTertiary} />
+          </Press>
         </Section>
+
+        <PrivacySection signedIn={Boolean(account.email)} onChanged={onPrivacyChanged} />
 
         <Section
           title="Notificaciones"
@@ -485,7 +724,12 @@ export function SettingsScreen({ settings, update, onClose, account, onAuth, onS
           </Section>
         )}
 
-        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>MRitmo {Constants.expoConfig?.version ?? ''}</Text>
+        <UpdateSection update={release} onCheck={onCheckUpdate} />
+
+        <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>
+          MRitmo {Constants.expoConfig?.version ?? ''}
+          {settings.theme === 'cream' ? ' · tema Crema (prueba)' : ''}
+        </Text>
       </ScrollView>
     </View>
   );

@@ -7,7 +7,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { dayKey } from './data';
 import type { Profile } from './friends';
-import { weekStartOf } from './friends';
+import { PROFILE_COLUMNS, weekStartOf } from './friends';
 import { getSession, supabase } from './sync';
 
 export type RoomMember = { profile: Profile; status: 'invited' | 'joined' };
@@ -55,7 +55,7 @@ export async function fetchRooms(): Promise<Room[]> {
   const people = [...new Set((members ?? []).flatMap((m) => [m.user_id, m.invited_by].filter(Boolean) as string[]))];
   const profiles: Record<string, Profile> = {};
   if (people.length) {
-    const { data } = await supabase.from('profiles').select('id, username, display_name, gender').in('id', people);
+    const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).in('id', people);
     for (const p of (data ?? []) as Profile[]) profiles[p.id] = p;
   }
 
@@ -170,4 +170,12 @@ export function subscribeRooms(onChange: () => void): () => void {
     if (timer) clearTimeout(timer);
     supabase.removeChannel(channel);
   };
+}
+
+/** Rooms you own (1.9): "Eliminar cuenta" says they pass to their oldest member. */
+export async function countOwnedRooms(): Promise<number> {
+  const me = await myId();
+  if (!me) return 0;
+  const { count } = await supabase.from('rooms').select('id', { count: 'exact', head: true }).eq('owner', me);
+  return count ?? 0;
 }

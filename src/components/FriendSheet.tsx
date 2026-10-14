@@ -22,6 +22,8 @@ type Props = {
   now: number;
   onClose: () => void;
   onRemove?: () => void;
+  /** Block this person (1.9). */
+  onBlock?: () => void;
   /** Shared habits and "Crear hábito juntos" (1.7). Rendered between the week and the footer. */
   children?: React.ReactNode;
 };
@@ -31,11 +33,11 @@ type Props = {
  * focus, their streak of complete days and the last seven days. Only
  * percentages and minutes — never what their tasks are.
  */
-export function FriendSheet({ visible, row, days, error, now, onClose, onRemove, children }: Props) {
+export function FriendSheet({ visible, row, days, error, now, onClose, onRemove, onBlock, children }: Props) {
   return (
     <Sheet visible={visible && row !== null} onClose={onClose}>
       {row ? (
-        <FriendBody row={row} days={days} error={error} now={now} onRemove={onRemove}>
+        <FriendBody row={row} days={days} error={error} now={now} onRemove={onRemove} onBlock={onBlock}>
           {children}
         </FriendBody>
       ) : null}
@@ -43,7 +45,7 @@ export function FriendSheet({ visible, row, days, error, now, onClose, onRemove,
   );
 }
 
-function FriendBody({ row, days, error, now, onRemove, children }: Omit<Props, 'onClose' | 'row' | 'visible'> & { row: BoardRow }) {
+function FriendBody({ row, days, error, now, onRemove, onBlock, children }: Omit<Props, 'onClose' | 'row' | 'visible'> & { row: BoardRow }) {
   const { c } = useTheme();
   const today = dayKey();
   const pct = Math.round(row.ratio * 100);
@@ -58,7 +60,7 @@ function FriendBody({ row, days, error, now, onRemove, children }: Omit<Props, '
   return (
     <ScrollView showsVerticalScrollIndicator={false} bounces={false} keyboardShouldPersistTaps="handled">
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg }}>
-        <Avatar gender={row.profile.gender} mood={moodFor(row.ratio, row.total > 0)} px={3} />
+        <Avatar gender={row.profile.gender} mood={row.hidden ? 'calma' : moodFor(row.ratio, row.total > 0)} px={3} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={[type.title, { color: c.text }]} numberOfLines={1}>
             {name}
@@ -88,74 +90,99 @@ function FriendBody({ row, days, error, now, onRemove, children }: Omit<Props, '
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: space.xl }}>
-        <Text style={[type.display, { color: c.text, fontVariant: ['tabular-nums'] }]}>{pct}</Text>
-        <Text style={[type.title, { color: c.textSecondary, marginBottom: 10, marginLeft: 4 }]}>%</Text>
-      </View>
-      <Text style={[type.callout, { color: c.textSecondary, marginBottom: space.md }]}>
-        {row.total > 0 ? `${formatMinutes(row.done)} de ${formatMinutes(row.total)} hoy` : 'Sin plan todavía hoy'}
-      </Text>
-      <ProgressBar ratio={row.ratio} />
-
-      <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.xl }}>
-        <Stat icon="flame" value={streak === null ? '—' : String(streak)} label={streak === 1 ? 'día completo seguido' : 'días completos seguidos'} />
-        <Stat icon="calendar-clear-outline" value={fullDays === null ? '—' : `${fullDays} de 7`} label="días completos esta semana" />
-      </View>
-
-      <Text style={[type.headline, { color: c.text, marginTop: space.xl, marginBottom: space.md }]}>Últimos 7 días</Text>
-      {week ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            backgroundColor: c.surface,
-            borderRadius: radius.lg,
-            paddingHorizontal: space.lg,
-            paddingTop: space.lg,
-            paddingBottom: space.md,
-          }}
-          accessible
-          accessibilityLabel={week.map((d) => `${dayInitial(d.day)} ${d.ratio === null ? 'sin plan' : `${Math.round(d.ratio * 100)} por ciento`}`).join(', ')}
-        >
-          {week.map((d) => {
-            const isToday = d.day === today;
-            const h = d.ratio === null ? 0 : Math.max(4, d.ratio * BAR_H);
-            return (
-              <View key={d.day} style={{ alignItems: 'center', flex: 1 }}>
-                <Text style={[type.caption, { color: d.ratio === null ? c.textTertiary : c.textSecondary, fontVariant: ['tabular-nums'], marginBottom: 6 }]}>
-                  {d.ratio === null ? '·' : Math.round(d.ratio * 100)}
-                </Text>
-                <View style={{ width: 20, height: BAR_H, borderRadius: 7, backgroundColor: c.track, overflow: 'hidden', justifyContent: 'flex-end' }}>
-                  <View style={{ height: h, backgroundColor: c.ink, borderRadius: 7 }} />
-                </View>
-                <Text style={[type.caption, { marginTop: space.sm, color: isToday ? c.text : c.textTertiary, fontFamily: isToday ? font.bold : font.medium }]}>
-                  {dayInitial(d.day)}
-                </Text>
-              </View>
-            );
-          })}
+      {row.hidden ? (
+        <View style={{ marginTop: space.xl, backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, flexDirection: 'row', gap: space.md }}>
+          <Ionicons name="eye-off-outline" size={22} color={c.textSecondary} />
+          <View style={{ flex: 1 }}>
+            <Text style={[type.headline, { color: c.text }]}>Avance oculto</Text>
+            <Text style={[type.footnote, { color: c.textSecondary, marginTop: 2 }]}>
+              Eligió no mostrar su % ni sus minutos. Siguen siendo amigos y pueden tener hábitos juntos.
+            </Text>
+          </View>
         </View>
-      ) : error ? (
-        <Text style={[type.footnote, { color: c.danger }]}>{error}</Text>
       ) : (
-        <View style={{ height: BAR_H + 56, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface, borderRadius: radius.lg }}>
-          <ActivityIndicator color={c.textSecondary} />
-        </View>
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: space.xl }}>
+            <Text style={[type.display, { color: c.text, fontVariant: ['tabular-nums'] }]}>{pct}</Text>
+            <Text style={[type.title, { color: c.textSecondary, marginBottom: 10, marginLeft: 4 }]}>%</Text>
+          </View>
+          <Text style={[type.callout, { color: c.textSecondary, marginBottom: space.md }]}>
+            {row.total > 0 ? `${formatMinutes(row.done)} de ${formatMinutes(row.total)} hoy` : 'Sin plan todavía hoy'}
+          </Text>
+          <ProgressBar ratio={row.ratio} />
+
+          <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.xl }}>
+            <Stat icon="flame" value={streak === null ? '—' : String(streak)} label={streak === 1 ? 'día completo seguido' : 'días completos seguidos'} />
+            <Stat icon="calendar-clear-outline" value={fullDays === null ? '—' : `${fullDays} de 7`} label="días completos esta semana" />
+          </View>
+
+          <Text style={[type.headline, { color: c.text, marginTop: space.xl, marginBottom: space.md }]}>Últimos 7 días</Text>
+          {week ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+                backgroundColor: c.surface,
+                borderRadius: radius.lg,
+                paddingHorizontal: space.lg,
+                paddingTop: space.lg,
+                paddingBottom: space.md,
+              }}
+              accessible
+              accessibilityLabel={week.map((d) => `${dayInitial(d.day)} ${d.ratio === null ? 'sin plan' : `${Math.round(d.ratio * 100)} por ciento`}`).join(', ')}
+            >
+              {week.map((d) => {
+                const isToday = d.day === today;
+                const h = d.ratio === null ? 0 : Math.max(4, d.ratio * BAR_H);
+                return (
+                  <View key={d.day} style={{ alignItems: 'center', flex: 1 }}>
+                    <Text style={[type.caption, { color: d.ratio === null ? c.textTertiary : c.textSecondary, fontVariant: ['tabular-nums'], marginBottom: 6 }]}>
+                      {d.ratio === null ? '·' : Math.round(d.ratio * 100)}
+                    </Text>
+                    <View style={{ width: 20, height: BAR_H, borderRadius: 7, backgroundColor: c.track, overflow: 'hidden', justifyContent: 'flex-end' }}>
+                      <View style={{ height: h, backgroundColor: c.ink, borderRadius: 7 }} />
+                    </View>
+                    <Text style={[type.caption, { marginTop: space.sm, color: isToday ? c.text : c.textTertiary, fontFamily: isToday ? font.bold : font.medium }]}>
+                      {dayInitial(d.day)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          ) : error ? (
+            <Text style={[type.footnote, { color: c.danger }]}>{error}</Text>
+          ) : (
+            <View style={{ height: BAR_H + 56, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface, borderRadius: radius.lg }}>
+              <ActivityIndicator color={c.textSecondary} />
+            </View>
+          )}
+        </>
       )}
 
       {children}
 
       <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.xl, textAlign: 'center' }]}>
         {row.me
-          ? 'Así te ven tus amigos: solo el % y los minutos, nunca tus tareas.'
+          ? row.profile.hide_progress
+            ? 'Ocultaste tu avance: tus amigos y salas te ven sin % ni minutos. Lo cambias en Configuración → Privacidad.'
+            : 'Así te ven tus amigos: solo el % y los minutos, nunca tus tareas.'
           : 'Solo ves su % y sus minutos, nunca sus tareas. Los hábitos juntos los ven los dos.'}
       </Text>
 
-      {onRemove && !row.me && (
-        <Press onPress={onRemove} accessibilityRole="button" style={{ alignSelf: 'center', padding: space.md, marginTop: space.sm }}>
-          <Text style={[type.callout, { color: c.danger }]}>Eliminar amigo</Text>
-        </Press>
+      {!row.me && (onRemove || onBlock) && (
+        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: space.lg, marginTop: space.sm }}>
+          {onRemove ? (
+            <Press onPress={onRemove} accessibilityRole="button" style={{ padding: space.md }}>
+              <Text style={[type.callout, { color: c.danger }]}>Eliminar amigo</Text>
+            </Press>
+          ) : null}
+          {onBlock ? (
+            <Press onPress={onBlock} accessibilityRole="button" style={{ padding: space.md }}>
+              <Text style={[type.callout, { color: c.danger }]}>Bloquear</Text>
+            </Press>
+          ) : null}
+        </View>
       )}
     </ScrollView>
   );

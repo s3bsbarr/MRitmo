@@ -19,18 +19,25 @@ import {
   claimUsername,
   DayProgress,
   FriendsState,
+  isOfflineError,
   loadDays,
   loadFriends,
+  loadFriendsCache,
+  PROFILE_COLUMNS,
   normalizeUsername,
   Period,
   Profile,
   rankRows,
   removeFriend,
   sendRequest,
+  saveFriendsCache,
   subscribeFriends,
   USERNAME_RE,
   weekOfMine,
 } from '../friends';
+import { blockUser, loadBlockedIds } from '../privacy';
+import { dayChip, timeLabel } from '../format';
+import { dayKey } from '../data';
 import * as Haptics from '../haptics';
 import { createRoom, deleteRoom, fetchRooms, inviteToRoom, joinRoom, leaveRoom, loadProgress, removeFromRoom, Room, RoomProgress, subscribeRooms } from '../rooms';
 import { friendName, SharedHabit } from '../shared';
@@ -59,6 +66,10 @@ type Props = {
   /** From an invitation link (mritmo.com/u/<usuario>): show "Agregar a @usuario". */
   addUsername?: string | null;
   onAddHandled?: () => void;
+  /** Today's key: the board reloads when the day changes at midnight (1.9). */
+  today: string;
+  /** Bumped when the app comes back to the front or privacy changed: reload (1.9). */
+  reloadKey?: number;
 };
 
 const empty: FriendsState = { me: null, friends: [], incoming: [], outgoing: [], progress: {}, week: {} };
@@ -93,6 +104,8 @@ export function Friends({
   onRoomOpened,
   addUsername,
   onAddHandled,
+  today,
+  reloadKey = 0,
 }: Props) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -104,6 +117,8 @@ export function Friends({
   const [addName, setAddName] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Under the title: someone left, a room is gone, you blocked someone (1.9). */
+  const [topNotice, setTopNotice] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -121,21 +136,45 @@ export function Friends({
   /** From an invitation link; kept until you have an account and a username. */
   const [pendingAdd, setPendingAdd] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState<{ username: string; profile: Profile | null; state: 'loading' | 'found' | 'missing' } | null>(null);
+  /** People you blocked (1.9): kept out of room boards on this phone too. */
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  /** The board loaded from the server at least once in this session. */
+  const loadedOnce = useRef(false);
+  /** No connection (1.9): what's on screen is the last board saved on the phone, from `at`. */
+  const [offline, setOffline] = useState<{ at: number | null } | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [friends, myRooms] = await Promise.all([loadFriends(), fetchRooms().catch(() => [] as Room[])]);
-      setSt(friends);
-      setRooms(myRooms);
+      const [friends, myRooms, blocked] = await Promise.all([loadFriends(), fetchRooms().catch((e: Error) => (isOfflineError(e.message) ? Promise.reject(e) : ([] as Room[]))), loadBlockedIds().catch(() => [] as string[])]);
       // Room mates who aren't friends: their progress comes from the room (RLS allows it once joined).
       const meId = friends.me?.id;
       const mates = [...new Set(myRooms.filter((r) => r.myStatus === 'joined').flatMap((r) => r.members.filter((m) => m.status === 'joined').map((m) => m.profile.id)))].filter(
         (id) => id !== meId,
       );
-      setRoomProgress(mates.length ? await loadProgress(mates) : noProgress);
+      const progress = mates.length ? await loadProgress(mates) : noProgress;
+      setSt(friends);
+      setRooms(myRooms);
+      setBlockedIds(blocked);
+      setRoomProgress(progress);
       setError(null);
+      setOffline(null);
+      loadedOnce.current = true;
+      saveFriendsCache(friends, myRooms, progress).catch(() => {});
     } catch (e) {
-      setError((e as Error).message);
+      const message = (e as Error).message;
+      if (isOfflineError(message)) {
+        // Offline: keep what's on screen, or bring back the last board saved on this phone.
+        if (!loadedOnce.current) {
+          const cached = await loadFriendsCache<Room[], RoomProgress>();
+          if (cached) {
+            setSt(cached.st);
+            setRooms(cached.rooms ?? []);
+            setRoomProgress(cached.roomProgress ?? noProgress);
+          }
+          setOffline({ at: cached?.at ?? null });
+        } else setOffline((o) => o ?? { at: Date.now() });
+        setError(null);
+      } else setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -160,6 +199,23 @@ export function Friends({
     };
   }, [signedIn, load]);
 
+  // New day at midnight, back to the app, or privacy changed: load again (1.9).
+  const firstReload = useRef(true);
+  useEffect(() => {
+    if (firstReload.current) {
+      firstReload.current = false;
+      return;
+    }
+    if (signedIn) load();
+  }, [today, reloadKey, signedIn, load]);
+
+  // Offline: try again every 20 s until the connection is back.
+  useEffect(() => {
+    if (!offline || !signedIn) return;
+    const id = setInterval(load, 20_000);
+    return () => clearInterval(id);
+  }, [offline, signedIn, load]);
+
   const openSheet = useCallback(
     (r: BoardRow) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -172,6 +228,11 @@ export function Friends({
       const req = ++sheetReq.current;
       if (r.me) {
         setSheetDays(history);
+        return;
+      }
+      // They hide their progress (1.9): there are no days to load.
+      if (r.hidden) {
+        setSheetDays([]);
         return;
       }
       setSheetDays(null);
@@ -194,6 +255,7 @@ export function Friends({
   useEffect(() => {
     if (!openRoomId || loading || !st.me) return;
     if (rooms.some((r) => r.id === openRoomId)) openRoom(openRoomId);
+    else if (!offline) setTopNotice('Esa sala ya no existe o ya no estás en ella.');
     onRoomOpened?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRoomId, loading, rooms]);
@@ -215,7 +277,7 @@ export function Friends({
     setLinkTarget({ username: u, profile: null, state: 'loading' });
     (async () => {
       if (!(await getSession())) return;
-      const { data } = await supabase.from('profiles').select('id, username, display_name, gender').eq('username', u).maybeSingle();
+      const { data } = await supabase.from('profiles').select(PROFILE_COLUMNS).eq('username', u).maybeSingle();
       setLinkTarget({ username: u, profile: (data as Profile) ?? null, state: data ? 'found' : 'missing' });
     })().catch(() => setLinkTarget({ username: u, profile: null, state: 'missing' }));
   }, [pendingAdd, signedIn, myId]);
@@ -225,9 +287,25 @@ export function Friends({
     if (!openFriendId || loading || !st.me) return;
     const row = boardOf(st, mine).find((r) => r.profile.id === openFriendId);
     if (row) openSheet(row);
+    else if (!offline) setTopNotice('Esa persona ya no está entre tus amigos: eliminó su cuenta o la amistad.');
     onFriendOpened?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openFriendId, loading, st]);
+
+  // The person on the open sheet left (deleted their account, removed or blocked you): close it (1.9).
+  useEffect(() => {
+    if (!sheetOpen || !sheetId || offline || loading || !st.me || sheetId === st.me.id) return;
+    if (!st.friends.some((f) => f.id === sheetId)) {
+      setSheetOpen(false);
+      setTopNotice('Esa persona ya no está entre tus amigos: eliminó su cuenta o dejó de ser tu amigo.');
+    }
+  }, [st, sheetOpen, sheetId, offline, loading]);
+
+  useEffect(() => {
+    if (!topNotice) return;
+    const id = setTimeout(() => setTopNotice(null), 8000);
+    return () => clearTimeout(id);
+  }, [topNotice]);
 
   const pad = {
     paddingTop: insets.top + space.xl,
@@ -281,6 +359,35 @@ export function Friends({
     );
   }
 
+  // 1b. Couldn't load (no connection and nothing saved, or a server error): never
+  // mistake that for "no username yet".
+  if (!st.me && (offline || (error && !loadedOnce.current))) {
+    return (
+      <ScrollView contentContainerStyle={pad} showsVerticalScrollIndicator={false}>
+        {title}
+        <View style={{ marginTop: space.xxxl, alignItems: 'flex-start' }}>
+          <Ionicons name={offline ? 'cloud-offline-outline' : 'alert-circle-outline'} size={30} color={c.textSecondary} />
+          <Text style={[type.title, { color: c.text, marginTop: space.md }]}>{offline ? 'Sin conexión' : 'No se pudo cargar'}</Text>
+          <Text style={[type.body, { color: c.textSecondary, marginTop: space.sm }]}>
+            {offline
+              ? 'Tus amigos y salas aparecen cuando vuelva internet. Tus tareas, hábitos y el foco siguen funcionando sin conexión.'
+              : error}
+          </Text>
+          <Press
+            onPress={() => {
+              setLoading(true);
+              load();
+            }}
+            accessibilityRole="button"
+            style={{ marginTop: space.xl, height: 48, paddingHorizontal: space.xl, borderRadius: radius.pill, backgroundColor: c.surface, justifyContent: 'center' }}
+          >
+            <Text style={[type.headline, { color: c.text }]}>Reintentar</Text>
+          </Press>
+        </View>
+      </ScrollView>
+    );
+  }
+
   // 2. Signed in, no username yet.
   if (!st.me) {
     const valid = USERNAME_RE.test(normalizeUsername(username));
@@ -327,9 +434,10 @@ export function Friends({
   const board = period === 'day' ? dayBoard : boardOf(st, mine, 'week', myWeek);
 
   /** A room's board: its joined members, from friends' and room mates' progress. */
+  const blockedSet = new Set(blockedIds);
   const roomRows = (room: Room, p: Period) =>
     rankRows(
-      room.members.filter((m) => m.status === 'joined').map((m) => m.profile),
+      room.members.filter((m) => m.status === 'joined' && !blockedSet.has(m.profile.id)).map((m) => m.profile),
       me,
       { today: mine, week: myWeek },
       { today: { ...roomProgress.today, ...st.progress }, week: { ...roomProgress.week, ...st.week } },
@@ -427,6 +535,29 @@ export function Friends({
     });
   };
 
+  /** Block (1.9): from a friend's sheet or a request. Explains what happens; they aren't told. */
+  const askBlock = (p: Profile) => {
+    setSheetOpen(false);
+    onConfirm({
+      title: `¿Bloquear a @${p.username}?`,
+      subject: p.display_name || `@${p.username}`,
+      detail:
+        'Dejan de ser amigos, se quitan sus hábitos juntos y ninguno verá el avance del otro, ni en salas. No podrá encontrarte ni enviarte solicitudes. No le avisamos. Puedes desbloquearlo en Configuración → Privacidad.',
+      confirmLabel: 'Bloquear',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await blockUser(p.id);
+          setTopNotice(`Bloqueaste a @${p.username}.`);
+        } catch (e) {
+          setError((e as Error).message);
+        }
+        load();
+        sharedApi.reload();
+      },
+    });
+  };
+
   /** Decline or cancel an invitation at once; leaving an active habit asks first. */
   const removeShared = (h: SharedHabit) => {
     if (h.status === 'pending') {
@@ -449,6 +580,7 @@ export function Friends({
   const liveSheetRow = dayBoard.find((r) => r.profile.id === sheetId) ?? null;
   if (liveSheetRow) lastSheetRow.current = liveSheetRow;
   const sheetRow = liveSheetRow ?? lastSheetRow.current;
+
 
   return (
     <ScrollView
@@ -485,7 +617,19 @@ export function Friends({
       </View>
       <Text style={[type.callout, { color: c.textSecondary, marginTop: 2 }]}>{period === 'day' ? 'Hoy, en vivo' : 'Esta semana, de lunes a hoy'}</Text>
 
+      {offline ? (
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.lg, backgroundColor: c.surface, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm }}
+          accessibilityLiveRegion="polite"
+        >
+          <Ionicons name="cloud-offline-outline" size={18} color={c.textSecondary} />
+          <Text style={[type.footnote, { color: c.textSecondary, flex: 1 }]}>
+            Sin conexión. {offline.at ? `Esto es lo último que cargó (${dayChip(dayKey(new Date(offline.at)), today).toLowerCase()} ${timeLabel(offline.at)}).` : 'No es en vivo.'} Se actualiza solo al volver.
+          </Text>
+        </View>
+      ) : null}
       {error ? <Text style={[type.footnote, { color: c.danger, marginTop: space.lg }]}>{error}</Text> : null}
+      {topNotice ? <Text style={[type.footnote, { color: c.textSecondary, marginTop: space.md }]}>{topNotice}</Text> : null}
 
       {linkTarget && <LinkCard target={linkTarget} me={me} friends={st.friends} outgoing={st.outgoing} onDone={() => { setLinkTarget(null); setPendingAdd(null); load(); }} />}
 
@@ -573,8 +717,12 @@ export function Friends({
           <Header title="Solicitudes" />
           <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {st.incoming.map((p, i) => (
-              <View
+              <Press
                 key={p.id}
+                onLongPress={() => askBlock(p)}
+                delayLongPress={450}
+                scaleTo={0.99}
+                accessibilityHint="Mantén presionado para bloquear"
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -613,9 +761,10 @@ export function Friends({
                 >
                   <Text style={[type.callout, { color: c.inkOnInk, fontFamily: font.semibold }]}>Aceptar</Text>
                 </Press>
-              </View>
+              </Press>
             ))}
           </View>
+          <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.sm }]}>Mantén presionada una solicitud para bloquear a esa persona.</Text>
         </>
       )}
 
@@ -754,6 +903,7 @@ export function Friends({
         now={now}
         onClose={() => setSheetOpen(false)}
         onRemove={sheetRow && !sheetRow.me ? () => askRemove(sheetRow.profile) : undefined}
+        onBlock={sheetRow && !sheetRow.me ? () => askBlock(sheetRow.profile) : undefined}
       >
         {sheetRow && !sheetRow.me ? (
           <SharedHabits

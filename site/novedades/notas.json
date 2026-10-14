@@ -1,0 +1,93 @@
+[
+  {
+    "version": "1.9",
+    "date": "2026-10-14",
+    "title": "Privacidad, eliminar tu cuenta y aviso de versiones nuevas.",
+    "items": [
+      "Al crear tu cuenta, tres pasos cortos: tu @usuario, tu primer amigo y las notificaciones.",
+      "Ocultar mi avance: tus amigos y tus salas te siguen viendo, pero sin % ni minutos. Está en Configuración → Privacidad.",
+      "Bloquear: toca a alguien en el ranking (o mantén presionada su solicitud) y elige Bloquear. Dejan de ser amigos, no te puede encontrar y no le avisamos.",
+      "Eliminar tu cuenta y tus datos desde Configuración, en un paso. Si tenías salas, pasan a quien lleva más tiempo en ellas.",
+      "MRitmo te avisa en Hoy cuando hay una versión nueva, con un botón para descargarla.",
+      "Sin conexión, Amigos muestra lo último que cargó en vez de una pantalla vacía, y se actualiza solo al volver internet.",
+      "Si dejas la app abierta pasada la medianoche, el día, los recordatorios y el ranking cambian solos.",
+      "Si alguien elimina su cuenta, desaparece de tu ranking y de tus salas sin errores."
+    ]
+  },
+  {
+    "version": "1.8",
+    "date": "2026-10-14",
+    "title": "Salas, ranking de la semana y enlace para invitar.",
+    "items": [
+      "Salas: un ranking propio con un grupo (el equipo, la familia, el gimnasio), del día y de la semana.",
+      "Ranking de la semana en Amigos: de lunes a hoy, sumando minutos.",
+      "Tu enlace mritmo.com/u/tu-usuario: quien lo abre con MRitmo instalada llega directo a \"Agregar a @tu-usuario\".",
+      "Los correos de la cuenta llegan en español desde soporte@mritmo.com, con un código de 6 dígitos."
+    ]
+  },
+  {
+    "version": "1.7",
+    "date": "2026-10-13",
+    "title": "Hábitos juntos y temporizador a pantalla completa.",
+    "items": [
+      "Hábitos juntos: un hábito con un amigo y una racha que solo avanza el día que los dos lo marcan.",
+      "Avisos de invitación y de \"ya marcó, faltas tú\", con botones para aceptar o marcar sin abrir la app.",
+      "Toca el temporizador en vivo y se abre a pantalla completa, con los números en grande.",
+      "En Android 17 (One UI 9) el temporizador en vivo muestra la cuenta regresiva en grande."
+    ]
+  },
+  {
+    "version": "1.6",
+    "date": "2026-10-13",
+    "title": "La hoja de cada amigo y avisos con la app cerrada.",
+    "items": [
+      "Toca a un amigo y ves su racha de días completos y sus últimos 7 días.",
+      "Te avisamos cuando te envían una solicitud o la aceptan, aunque la app esté cerrada.",
+      "\"Olvidé mi contraseña\" desde la app."
+    ]
+  },
+  {
+    "version": "1.5",
+    "date": "2026-10-13",
+    "title": "Amigos con ranking en vivo.",
+    "items": [
+      "Amigos: el % del día de cada uno, en vivo, y quién está en foco.",
+      "Edita tus tareas y hábitos manteniéndolos presionados.",
+      "Vibración en toda la app y entrar sin contraseña con un enlace al correo."
+    ]
+  },
+  {
+    "version": "1.4",
+    "date": "2026-10-13",
+    "title": "El temporizador en la barra de estado y la Now Bar.",
+    "items": ["El temporizador de Foco aparece en la barra de estado y en la Now Bar de Samsung (Android 16)."]
+  },
+  {
+    "version": "1.3",
+    "date": "2026-10-13",
+    "title": "Cuenta con respaldo.",
+    "items": ["Crea una cuenta y tus tareas, hábitos y ajustes quedan respaldados: si cambias de celular, vuelve todo."]
+  },
+  {
+    "version": "1.2",
+    "date": "2026-10-12",
+    "title": "Tareas con hora, hábitos y recordatorios.",
+    "items": [
+      "Programa tareas para un día y una hora.",
+      "Hábitos diarios con racha.",
+      "Recordatorios con botones para empezar, sumar tiempo o terminar sin abrir la app."
+    ]
+  },
+  {
+    "version": "1.1",
+    "date": "2026-10-12",
+    "title": "Widgets y temporizador en vivo.",
+    "items": ["Widgets de Estado y de Foco.", "Duración libre para cada tarea.", "Bienvenida y Configuración."]
+  },
+  {
+    "version": "1",
+    "date": "2026-10-12",
+    "title": "La primera versión.",
+    "items": ["Tareas con duración: tu día se mide en tiempo, no en número de tareas.", "Foco con temporizador y el resumen de la semana."]
+  }
+]

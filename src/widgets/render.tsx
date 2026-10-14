@@ -27,6 +27,7 @@ export function timerStateOf({ tasks, focus }: Snapshot, now = Date.now()): Time
 function themed(settings: Settings, draw: (c: WC) => React.JSX.Element): WidgetRepresentation {
   if (settings.theme === 'light') return draw(W.light);
   if (settings.theme === 'dark') return draw(W.dark);
+  if (settings.theme === 'cream') return draw(W.cream);
   return { light: draw(W.light), dark: draw(W.dark) };
 }
 

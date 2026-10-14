@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'tools/web-build.mjs'
       - '.github/workflows/web.yml'
   workflow_dispatch:
 
@@ -29,23 +30,30 @@ jobs:
       - name: Check the site
         run: |
           python3 -m json.tool site/.well-known/assetlinks.json > /dev/null
-          test -f site/index.html && test -f site/u/index.html && test -f site/.htaccess
+          test -f site/index.html && test -f site/u/index.php && test -f site/.htaccess
+          python3 -m json.tool site/novedades/notas.json > /dev/null
 
-      # The site reads the latest APK's version, size and date from its own /version.json,
-      # so visitors never call GitHub's API. Build APK re-runs this flow after each release.
-      - name: Write version.json from the latest release
+      # The site and the app read the latest APK's version, size, date, SHA-256 and notes
+      # from mritmo.com/version.json, so nobody calls GitHub's API. Build APK re-runs this
+      # flow after each release. /novedades is rendered from site/novedades/notas.json.
+      - name: Write version.json and /novedades from the latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api "repos/${{ github.repository }}/releases/latest" \
             --jq '{version: (.tag_name | ltrimstr("v")), bytes: ([.assets[] | select(.name == "MRitmo.apk") | .size][0] // 0), published: .published_at}' \
-            > site/version.json || echo '{}' > site/version.json
+            > "$RUNNER_TEMP/release.json" || echo '{}' > "$RUNNER_TEMP/release.json"
+          SHA=""
+          if gh release download --repo "${{ github.repository }}" --pattern MRitmo.apk --dir "$RUNNER_TEMP/apk" --clobber; then
+            SHA=$(sha256sum "$RUNNER_TEMP/apk/MRitmo.apk" | cut -d' ' -f1)
+          fi
+          node tools/web-build.mjs "$RUNNER_TEMP/release.json" "$SHA"
           cat site/version.json
 
       # Hostinger's CDN caches CSS/JS for days: stamp every reference with this commit
       # (style.css?v=__V__ in the HTML) so a deploy is visible right away.
       - name: Stamp asset versions
-        run: find site -name '*.html' -exec sed -i "s/__V__/${GITHUB_SHA::7}/g" {} +
+        run: find site \( -name '*.html' -o -name '*.php' \) -exec sed -i "s/__V__/${GITHUB_SHA::7}/g" {} +
 
       - name: Push site/ to the web branch
         run: |
