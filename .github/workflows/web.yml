@@ -42,6 +42,11 @@ jobs:
             > site/version.json || echo '{}' > site/version.json
           cat site/version.json
 
+      # Hostinger's CDN caches CSS/JS for days: stamp every reference with this commit
+      # (style.css?v=__V__ in the HTML) so a deploy is visible right away.
+      - name: Stamp asset versions
+        run: find site -name '*.html' -exec sed -i "s/__V__/${GITHUB_SHA::7}/g" {} +
+
       - name: Push site/ to the web branch
         run: |
           cd site

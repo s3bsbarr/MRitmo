@@ -45,4 +45,8 @@ RewriteRule ^u/[A-Za-z0-9_.]+/?$ /u/index.html [L]
   <FilesMatch "\.(html)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
+  # CSS/JS: references carry ?v=<commit> (stamped on deploy); short cache as a fallback.
+  <FilesMatch "\.(css|js)$">
+    Header set Cache-Control "public, max-age=300"
+  </FilesMatch>
 </IfModule>
