@@ -3,8 +3,8 @@ import { createContext, useContext } from 'react';
 import { SPRITE_COLORS } from './avatar/sprites';
 
 export type Scheme = 'light' | 'dark';
-/** 'cream' (1.9) is a test theme for Sebas, not an official one: the cream of mritmo.com. */
-export type ThemePref = 'system' | 'light' | 'dark' | 'cream';
+export type { DarkTone, LightTone, ThemePref } from './data';
+import type { DarkTone, LightTone, ThemePref } from './data';
 
 /**
  * Monochrome palette. White leads in light mode, true black in dark mode.
@@ -57,8 +57,8 @@ const dark: typeof light = {
 };
 
 /**
- * "Crema (prueba)", 1.9: the same paper as mritmo.com (#f7f3ea background,
- * #ece6da surfaces, ink #18160f). A light scheme, only for trying it out.
+ * Crema (1.9 as a test, a light tone since 1.9.1): the same paper as mritmo.com
+ * (#f7f3ea background, #ece6da surfaces, ink #18160f).
  */
 const cream: typeof light = {
   scheme: 'light',
@@ -83,7 +83,43 @@ const cream: typeof light = {
   sprite: { ...(SPRITE_COLORS.light as Record<string, string>), B: '#E2DBCC', Z: '#9F9888' },
 };
 
-export const palettes = { light, dark, cream };
+/**
+ * Tinto (1.9.1): the dark tone that pairs with Crema. A warm black, like a cup
+ * of tinto, instead of pure black; text is the cream paper. Same contrast as the
+ * black dark mode (secondary text 6.9:1 on the background, AA everywhere).
+ */
+const tinto: typeof light = {
+  scheme: 'dark',
+  bg: '#15120E',
+  surface: '#211D17',
+  surfaceStrong: '#2B261F',
+  ink: '#F3ECDF',
+  inkOnInk: '#15120E',
+  text: '#F3ECDF',
+  textSecondary: '#A69D8C',
+  textTertiary: '#756D60',
+  separator: 'rgba(243,236,223,0.08)',
+  track: 'rgba(243,236,223,0.10)',
+  danger: '#FF7A66',
+  glassFill: 'rgba(36,31,24,0.74)',
+  glassEdge: 'rgba(255,246,228,0.14)',
+  glassBorder: 'rgba(255,246,228,0.06)',
+  glassTint: 'systemChromeMaterialDark' as BlurTint,
+  scrim: 'rgba(8,6,3,0.58)',
+  shadow: '#000000',
+  // The dark character, warmed: shirt, bench and "z" in coffee tones.
+  sprite: { ...(SPRITE_COLORS.dark as Record<string, string>), O: '#D6CEBF', C: '#1D1913', D: '#EFE8DB', K: '#EFE8DB', B: '#2E2921', Z: '#A69D8C' },
+};
+
+export const palettes = { light, dark, cream, tinto };
+
+/** The palette for a theme choice, the system's mode and the two tones (1.9.1). */
+export function paletteFor(theme: ThemePref, system: 'light' | 'dark', lightTone: LightTone, darkTone: DarkTone): Palette {
+  const mode = theme === 'system' ? system : theme === 'cream' ? 'light' : theme;
+  const tone = theme === 'cream' ? 'cream' : mode === 'light' ? lightTone : darkTone;
+  if (mode === 'light') return tone === 'cream' ? cream : light;
+  return tone === 'tinto' ? tinto : dark;
+}
 export type Palette = typeof light;
 
 export const font = {

@@ -33,7 +33,7 @@ import { Welcome } from './src/screens/Welcome';
 import { clearSharedCache } from './src/shared';
 import { useHabits, useShared, useTasks } from './src/store';
 import { deleteAccount, forgetSession, getSession, handleAuthUrl, scheduleSync, signOut, supabase, syncNow } from './src/sync';
-import { palettes, ThemeContext } from './src/theme';
+import { paletteFor, ThemeContext } from './src/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 configureNotifications();
@@ -112,8 +112,18 @@ export default function App() {
 
   // The task and habit hooks return new objects every render; keep their reload
   // functions in a ref so listeners below are registered exactly once.
-  const reloaders = useRef({ tasks: api.reload, habits: habitsApi.reload });
-  reloaders.current = { tasks: api.reload, habits: habitsApi.reload };
+  const reloaders = useRef({ tasks: api.reload, habits: habitsApi.reload, shared: sharedApi.reload });
+  reloaders.current = { tasks: api.reload, habits: habitsApi.reload, shared: sharedApi.reload };
+
+  /**
+   * Something changed on the server (a push arrived or was tapped, or the app came
+   * back): reload shared habits, friends and rooms now instead of waiting for the
+   * live connection, which Android pauses in the background (1.9.1).
+   */
+  const refreshSocial = useCallback(() => {
+    reloaders.current.shared().catch(() => {});
+    setReloadKey((k) => k + 1);
+  }, []);
 
   /** Re-read everything a widget, a notification button or a restore may have changed. */
   const reloadAll = useCallback(async () => {
@@ -237,7 +247,7 @@ export default function App() {
         await onAppForeground();
         await reloadAll();
         checkForUpdate().then(setRelease);
-        setReloadKey((k) => k + 1);
+        refreshSocial();
         if (await getSession()) {
           runSync();
           refreshPush();
@@ -247,7 +257,7 @@ export default function App() {
       }
     });
     return () => sub.remove();
-  }, [reloadAll, runSync, refreshPush]);
+  }, [reloadAll, runSync, refreshPush, refreshSocial]);
 
   // ritmo://hoy, ritmo://foco, ritmo://resumen and ritmo://nueva come from widgets and notifications.
   // https://mritmo.com/u/<usuario> (Android App Link) and ritmo://agregar/<usuario> open "Agregar a @usuario".
@@ -308,6 +318,7 @@ export default function App() {
     Linking.getInitialURL().then(route).catch(() => {});
     const linkSub = Linking.addEventListener('url', (e) => route(e.url));
     let notifSub: { remove: () => void } | null = null;
+    let receivedSub: { remove: () => void } | null = null;
     if (Platform.OS !== 'web') {
       const onResponse = async (r: Notifications.NotificationResponse) => {
         const data = (r.notification.request.content.data ?? {}) as { url?: string; taskId?: string; habitId?: string; sharedId?: string; roomId?: string };
@@ -315,8 +326,16 @@ export default function App() {
           await applyAction(r.actionIdentifier, data);
           await reloadAll();
           Notifications.dismissNotificationAsync(r.notification.request.identifier).catch(() => {});
-        } else route(data.url);
+        } else {
+          refreshSocial();
+          route(data.url);
+        }
       };
+      // A push from the server while MRitmo is open: show the change right away (1.9.1).
+      receivedSub = Notifications.addNotificationReceivedListener((n) => {
+        const kind = (n.request.content.data as { kind?: string } | undefined)?.kind ?? '';
+        if (/^(habit_|friend_|room_)/.test(kind)) refreshSocial();
+      });
       Notifications.getLastNotificationResponseAsync()
         .then((r) => r && r.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER && route((r.notification.request.content.data as { url?: string })?.url))
         .catch(() => {});
@@ -325,12 +344,13 @@ export default function App() {
     return () => {
       linkSub.remove();
       notifSub?.remove();
+      receivedSub?.remove();
     };
-  }, [route, reloadAll]);
+  }, [route, reloadAll, refreshSocial]);
 
-  // "Crema (prueba)" is a light scheme with its own colors (1.9, only for trying it out).
-  const scheme = settings.theme === 'system' ? (system === 'dark' ? 'dark' : 'light') : settings.theme === 'cream' ? 'light' : settings.theme;
-  const c = settings.theme === 'cream' ? palettes.cream : palettes[scheme];
+  // Light is white or cream, dark is black or tinto (1.9.1).
+  const c = paletteFor(settings.theme, system === 'dark' ? 'dark' : 'light', settings.lightTone, settings.darkTone);
+  const scheme = c.scheme;
 
   const theme = useMemo(
     () => ({ c, pref: settings.theme, setPref: (p: ThemePref) => update({ theme: p }) }),

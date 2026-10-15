@@ -219,7 +219,14 @@ export async function setSharedMark(id: string, checked: boolean, day = dayKey()
   return done;
 }
 
-/** Live: the other person marking, accepting or leaving reloads the list. */
+/**
+ * Live: the other person marking, accepting or leaving reloads the list.
+ *
+ * 1.9.1: Android drops this connection while the app is in the background, so
+ * whatever happened meanwhile never arrives as an event. Every time the channel
+ * (re)joins we reload, which catches up on anything missed. The app also reloads
+ * when it comes back to the front and when a push about habits arrives.
+ */
 export function subscribeShared(onChange: () => void): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const ping = () => {
@@ -230,7 +237,9 @@ export function subscribeShared(onChange: () => void): () => void {
     .channel('ritmo-shared')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_habits' }, ping)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'shared_habit_checks' }, ping)
-    .subscribe();
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') ping();
+    });
   return () => {
     if (timer) clearTimeout(timer);
     supabase.removeChannel(channel);

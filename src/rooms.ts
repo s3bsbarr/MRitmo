@@ -165,7 +165,10 @@ export function subscribeRooms(onChange: () => void): () => void {
     .channel('ritmo-rooms')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, ping)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members' }, ping)
-    .subscribe();
+    .subscribe((status) => {
+      // (Re)joined after the app was in the background: catch up on what was missed (1.9.1).
+      if (status === 'SUBSCRIBED') ping();
+    });
   return () => {
     if (timer) clearTimeout(timer);
     supabase.removeChannel(channel);

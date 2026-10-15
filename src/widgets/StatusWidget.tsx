@@ -27,7 +27,7 @@ export type StatusProps = {
 export function StatusWidget({ c, gender, done, total, ratio, hasTasks, width, height }: StatusProps) {
   const mood = moodFor(ratio, hasTasks);
   const pct = Math.round(ratio * 100);
-  const sprite = spriteSvg(gender, mood, c.scheme);
+  const sprite = spriteSvg(gender, mood, c.scheme, c.sprite);
   const label = hasTasks ? `MRitmo, ${pct} por ciento del día` : 'MRitmo, sin tareas hoy';
   const base = {
     height: 'match_parent' as const,

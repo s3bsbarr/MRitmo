@@ -2,6 +2,8 @@ type Hex = `#${string}`;
 
 export type WC = {
   scheme: 'light' | 'dark';
+  /** Character colors for this tone (cream, tinto); absent uses the scheme's. */
+  sprite?: Record<string, string>;
   bg: Hex;
   surface: Hex;
   ink: Hex;
@@ -11,7 +13,7 @@ export type WC = {
   track: Hex;
 };
 
-export const W: { light: WC; dark: WC; cream: WC } = {
+export const W: { light: WC; dark: WC; cream: WC; tinto: WC } = {
   light: {
     scheme: 'light',
     bg: '#FFFFFF',
@@ -32,9 +34,10 @@ export const W: { light: WC; dark: WC; cream: WC } = {
     secondary: '#8E8E95',
     track: '#2A2A2E',
   },
-  // "Crema (prueba)" (1.9): the cream of mritmo.com, only when picked in Configuración.
+  // Crema (light tone) and Tinto (dark tone), 1.9.1: same colors as the app.
   cream: {
     scheme: 'light',
+    sprite: { B: '#E2DBCC', Z: '#9F9888' },
     bg: '#F7F3EA',
     surface: '#ECE6DA',
     ink: '#18160F',
@@ -42,6 +45,17 @@ export const W: { light: WC; dark: WC; cream: WC } = {
     text: '#18160F',
     secondary: '#5E594D',
     track: '#E2DBCC',
+  },
+  tinto: {
+    scheme: 'dark',
+    sprite: { O: '#D6CEBF', C: '#1D1913', D: '#EFE8DB', K: '#EFE8DB', B: '#2E2921', Z: '#A69D8C' },
+    bg: '#15120E',
+    surface: '#211D17',
+    ink: '#F3ECDF',
+    inkOnInk: '#15120E',
+    text: '#F3ECDF',
+    secondary: '#A69D8C',
+    track: '#2E2921',
   },
 };
 

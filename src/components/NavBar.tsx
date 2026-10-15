@@ -24,8 +24,10 @@ export function NavBar({ tab, onTab, onAdd }: { tab: Tab; onTab: (t: Tab) => voi
   const insets = useSafeAreaInsets();
 
   const bottom = Math.max(insets.bottom, space.md) + space.sm;
-  const clear = c.scheme === 'dark' ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0)';
-  const mid = c.scheme === 'dark' ? 'rgba(0,0,0,0.82)' : 'rgba(255,255,255,0.82)';
+  // Fade into the page's own color (white, cream, black or tinto).
+  const rgb = [1, 3, 5].map((i) => parseInt(c.bg.slice(i, i + 2), 16)).join(',');
+  const clear = `rgba(${rgb},0)`;
+  const mid = `rgba(${rgb},0.82)`;
 
   return (
     <>

@@ -1,5 +1,16 @@
 [
   {
+    "version": "1.9.1",
+    "date": "2026-10-14",
+    "title": "Hábitos juntos al instante y dos tonos para cada modo.",
+    "items": [
+      "Cuando un amigo te invita a un hábito, lo acepta o marca, ahora lo ves apenas abres MRitmo o te llega el aviso, sin tener que cerrar y abrir la app.",
+      "Las solicitudes de amistad y sus aceptaciones también aparecen en vivo.",
+      "Mientras esperas que alguien acepte un hábito, la app revisa sola cada 30 segundos.",
+      "Configuración → Apariencia: el modo claro puede ser Blanco o Crema, y el oscuro Negro o Tinto (un negro cálido, como un café). Los widgets usan el mismo tono."
+    ]
+  },
+  {
     "version": "1.9",
     "date": "2026-10-14",
     "title": "Privacidad, eliminar tu cuenta y aviso de versiones nuevas.",
@@ -60,13 +71,17 @@
     "version": "1.4",
     "date": "2026-10-13",
     "title": "El temporizador en la barra de estado y la Now Bar.",
-    "items": ["El temporizador de Foco aparece en la barra de estado y en la Now Bar de Samsung (Android 16)."]
+    "items": [
+      "El temporizador de Foco aparece en la barra de estado y en la Now Bar de Samsung (Android 16)."
+    ]
   },
   {
     "version": "1.3",
     "date": "2026-10-13",
     "title": "Cuenta con respaldo.",
-    "items": ["Crea una cuenta y tus tareas, hábitos y ajustes quedan respaldados: si cambias de celular, vuelve todo."]
+    "items": [
+      "Crea una cuenta y tus tareas, hábitos y ajustes quedan respaldados: si cambias de celular, vuelve todo."
+    ]
   },
   {
     "version": "1.2",
@@ -82,12 +97,19 @@
     "version": "1.1",
     "date": "2026-10-12",
     "title": "Widgets y temporizador en vivo.",
-    "items": ["Widgets de Estado y de Foco.", "Duración libre para cada tarea.", "Bienvenida y Configuración."]
+    "items": [
+      "Widgets de Estado y de Foco.",
+      "Duración libre para cada tarea.",
+      "Bienvenida y Configuración."
+    ]
   },
   {
     "version": "1",
     "date": "2026-10-12",
     "title": "La primera versión.",
-    "items": ["Tareas con duración: tu día se mide en tiempo, no en número de tareas.", "Foco con temporizador y el resumen de la semana."]
+    "items": [
+      "Tareas con duración: tu día se mide en tiempo, no en número de tareas.",
+      "Foco con temporizador y el resumen de la semana."
+    ]
   }
 ]

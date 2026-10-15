@@ -39,13 +39,19 @@ export type FocusState = {
   started?: boolean;
 };
 
+/** 'cream' is the 1.9 test value; since 1.9.1 it reads as light + lightTone 'cream'. */
 export type ThemePref = 'system' | 'light' | 'dark' | 'cream';
+/** Which light and which dark (1.9.1): white or cream, black or tinto (a warm black). */
+export type LightTone = 'white' | 'cream';
+export type DarkTone = 'black' | 'tinto';
 export type Gender = 'm' | 'f';
 
 export type Settings = {
   name: string;
   gender: Gender;
   theme: ThemePref;
+  lightTone: LightTone;
+  darkTone: DarkTone;
   onboarded: boolean;
   remindMorning: boolean;
   remindEvening: boolean;
@@ -71,6 +77,8 @@ export const defaultSettings: Settings = {
   name: '',
   gender: 'm',
   theme: 'system',
+  lightTone: 'white',
+  darkTone: 'black',
   onboarded: false,
   remindMorning: true,
   remindEvening: true,
@@ -236,9 +244,21 @@ export async function loadFocus(): Promise<FocusState> {
 
 export const saveFocus = (f: FocusState) => writeJson(FOCUS_KEY, f);
 
+/** Settings from any version, in today's shape (1.9's "Crema (prueba)" becomes light + cream). */
+export function normalizeSettings(s: Settings): Settings {
+  const out = { ...s };
+  if (out.theme === 'cream') {
+    out.theme = 'light';
+    out.lightTone = 'cream';
+  }
+  if (out.lightTone !== 'white' && out.lightTone !== 'cream') out.lightTone = 'white';
+  if (out.darkTone !== 'black' && out.darkTone !== 'tinto') out.darkTone = 'black';
+  return out;
+}
+
 export async function loadSettings(): Promise<Settings> {
   const stored = await readJson<Partial<Settings> | null>(SETTINGS_KEY, null);
-  if (stored) return { ...defaultSettings, ...stored };
+  if (stored) return normalizeSettings({ ...defaultSettings, ...stored });
   // First run on this version: carry over theme and character from older builds.
   const migrated = { ...defaultSettings };
   try {

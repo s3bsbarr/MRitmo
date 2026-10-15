@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 import { dayKey, Habit, loadHabits, loadTasks, progressOf, rememberDeleted, saveHabits, saveTasks, shiftDay, Task, tasksForDay, uid, upcomingTasks } from './data';
 
 import {
@@ -197,6 +198,17 @@ export function useShared(signedIn: boolean) {
     reload();
     return subscribeShared(reload);
   }, [signedIn, reload]);
+
+  // 1.9.1: while an invitation is waiting (yours or theirs), check every 30 s with
+  // the app open, so an acceptance shows up even if the live connection missed it.
+  const waiting = habits.some((h) => h.status === 'pending');
+  useEffect(() => {
+    if (!signedIn || !waiting) return;
+    const id = setInterval(() => {
+      if (AppState.currentState === 'active') reload();
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [signedIn, waiting, reload]);
 
   const toggleToday = useCallback(async (id: string) => {
     const today = dayKey();

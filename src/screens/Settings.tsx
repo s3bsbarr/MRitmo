@@ -8,7 +8,7 @@ import { Press } from '../components/Press';
 import { TimeField } from '../components/TimeField';
 import RitmoLive, { type LiveDiagnosis } from '../../modules/ritmo-live/src/RitmoLiveModule';
 import { hhmmLabel } from '../format';
-import type { Gender, Settings as SettingsT, ThemePref } from '../data';
+import type { DarkTone, Gender, LightTone, Settings as SettingsT, ThemePref } from '../data';
 import { requestNotificationPermission } from '../effects';
 import { font, radius, space, type, useTheme } from '../theme';
 import * as Notifications from 'expo-notifications';
@@ -185,6 +185,55 @@ function LiveSection() {
         </Press>
       </View>
     </Section>
+  );
+}
+
+type ToneOption = { key: string; label: string; bg: string; surface: string; ink: string };
+
+/**
+ * Which white and which black (1.9.1): two small previews per mode. The choice
+ * applies whenever that mode is on, also when the mode follows the system.
+ */
+function ToneRow({ title, value, options, onChange }: { title: string; value: string; options: ToneOption[]; onChange: (k: string) => void }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ marginTop: space.lg }}>
+      <Text style={[type.footnote, { color: c.textSecondary, marginBottom: space.sm }]}>{title}</Text>
+      <View style={{ flexDirection: 'row', gap: space.md }} accessibilityRole="radiogroup" accessibilityLabel={title}>
+        {options.map((o) => {
+          const active = value === o.key;
+          return (
+            <Press
+              key={o.key}
+              onPress={() => {
+                if (active) return;
+                Haptics.selectionAsync().catch(() => {});
+                onChange(o.key);
+              }}
+              scaleTo={0.97}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`${title}: ${o.label}`}
+              style={{ flex: 1, borderRadius: radius.lg, borderWidth: 2, borderColor: active ? c.ink : c.separator, padding: 4 }}
+            >
+              <View style={{ height: 64, borderRadius: radius.md, backgroundColor: o.bg, padding: 10, justifyContent: 'space-between', borderWidth: 1, borderColor: 'rgba(128,128,128,0.18)' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: o.ink }} />
+                  <View style={{ width: 38, height: 6, borderRadius: 3, backgroundColor: o.ink, opacity: 0.85 }} />
+                </View>
+                <View style={{ height: 14, borderRadius: 5, backgroundColor: o.surface, justifyContent: 'center', paddingHorizontal: 5 }}>
+                  <View style={{ width: '55%', height: 4, borderRadius: 2, backgroundColor: o.ink, opacity: 0.6 }} />
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 }}>
+                <Ionicons name={active ? 'checkmark-circle' : 'ellipse-outline'} size={18} color={active ? c.ink : c.textTertiary} />
+                <Text style={[type.callout, { color: active ? c.text : c.textSecondary }]}>{o.label}</Text>
+              </View>
+            </Press>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -572,10 +621,10 @@ export function SettingsScreen({
           </View>
         </Section>
 
-        <Section title="Apariencia">
+        <Section title="Apariencia" note="Cada modo tiene dos tonos. Con Sistema, se usa el tono del claro cuando el teléfono está en modo claro y el del oscuro cuando está en oscuro. Los widgets también.">
           <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.md, padding: 4 }} accessibilityRole="radiogroup">
             {themes.map((t) => {
-              const active = settings.theme === t.key;
+              const active = (settings.theme === 'cream' ? 'light' : settings.theme) === t.key;
               return (
                 <Press
                   key={t.key}
@@ -605,41 +654,24 @@ export function SettingsScreen({
               );
             })}
           </View>
-          {/* 1.9: a test theme, not an official one. It reads as a test on purpose. */}
-          <Press
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              update({ theme: settings.theme === 'cream' ? 'system' : 'cream' });
-            }}
-            scaleTo={0.99}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: settings.theme === 'cream' }}
-            accessibilityLabel="Crema, tema de prueba"
-            style={{
-              marginTop: space.sm,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: space.md,
-              minHeight: 56,
-              paddingHorizontal: space.lg,
-              borderRadius: radius.md,
-              borderWidth: 1.5,
-              borderStyle: 'dashed',
-              borderColor: settings.theme === 'cream' ? c.ink : c.separator,
-            }}
-          >
-            <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: '#F7F3EA', borderWidth: 1, borderColor: 'rgba(24,22,15,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#18160F' }} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[type.body, { color: c.text }]}>Crema (prueba)</Text>
-              <Text style={[type.footnote, { color: c.textSecondary }]}>El color de mritmo.com. No es oficial, puede cambiar.</Text>
-            </View>
-            <View style={{ paddingHorizontal: 8, height: 22, borderRadius: radius.pill, borderWidth: 1, borderColor: c.textSecondary, justifyContent: 'center' }}>
-              <Text style={[type.caption, { color: c.textSecondary, fontFamily: font.semibold, letterSpacing: 0.6 }]}>PRUEBA</Text>
-            </View>
-            <Ionicons name={settings.theme === 'cream' ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={settings.theme === 'cream' ? c.ink : c.textTertiary} />
-          </Press>
+          <ToneRow
+            title="Modo claro"
+            value={settings.theme === 'cream' ? 'cream' : settings.lightTone}
+            options={[
+              { key: 'white', label: 'Blanco', bg: '#FFFFFF', surface: '#F4F4F6', ink: '#0A0A0B' },
+              { key: 'cream', label: 'Crema', bg: '#F7F3EA', surface: '#ECE6DA', ink: '#18160F' },
+            ]}
+            onChange={(k) => update({ lightTone: k as LightTone, ...(settings.theme === 'cream' ? { theme: 'light' as const } : {}) })}
+          />
+          <ToneRow
+            title="Modo oscuro"
+            value={settings.darkTone}
+            options={[
+              { key: 'black', label: 'Negro', bg: '#000000', surface: '#1C1C1F', ink: '#F5F5F7' },
+              { key: 'tinto', label: 'Tinto', bg: '#15120E', surface: '#2B261F', ink: '#F3ECDF' },
+            ]}
+            onChange={(k) => update({ darkTone: k as DarkTone })}
+          />
         </Section>
 
         <PrivacySection signedIn={Boolean(account.email)} onChanged={onPrivacyChanged} />
@@ -728,7 +760,6 @@ export function SettingsScreen({
 
         <Text style={[type.caption, { color: c.textTertiary, textAlign: 'center', marginTop: space.xxxl }]}>
           MRitmo {Constants.expoConfig?.version ?? ''}
-          {settings.theme === 'cream' ? ' · tema Crema (prueba)' : ''}
         </Text>
       </ScrollView>
     </View>

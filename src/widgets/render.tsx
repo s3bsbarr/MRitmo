@@ -23,12 +23,13 @@ export function timerStateOf({ tasks, focus }: Snapshot, now = Date.now()): Time
   return next ? { kind: 'next', title: next.title, minutes: next.minutes } : { kind: 'empty' };
 }
 
-/** Follow the app's theme setting; "system" lets Android pick per its dark mode. */
+/** Follow the app's theme and tones; "system" lets Android pick per its dark mode. */
 function themed(settings: Settings, draw: (c: WC) => React.JSX.Element): WidgetRepresentation {
-  if (settings.theme === 'light') return draw(W.light);
-  if (settings.theme === 'dark') return draw(W.dark);
-  if (settings.theme === 'cream') return draw(W.cream);
-  return { light: draw(W.light), dark: draw(W.dark) };
+  const lightC = settings.theme === 'cream' || settings.lightTone === 'cream' ? W.cream : W.light;
+  const darkC = settings.darkTone === 'tinto' ? W.tinto : W.dark;
+  if (settings.theme === 'light' || settings.theme === 'cream') return draw(lightC);
+  if (settings.theme === 'dark') return draw(darkC);
+  return { light: draw(lightC), dark: draw(darkC) };
 }
 
 export function renderWidget(info: Pick<WidgetInfo, 'widgetName' | 'width' | 'height'>, snap: Snapshot): WidgetRepresentation {

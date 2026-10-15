@@ -383,7 +383,10 @@ export function subscribeFriends(onChange: () => void): () => void {
     .channel('ritmo-friends')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'day_progress' }, ping)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, ping)
-    .subscribe();
+    .subscribe((status) => {
+      // (Re)joined after the app was in the background: catch up on what was missed (1.9.1).
+      if (status === 'SUBSCRIBED') ping();
+    });
   return () => {
     if (timer) clearTimeout(timer);
     supabase.removeChannel(channel);

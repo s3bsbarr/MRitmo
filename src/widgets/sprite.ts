@@ -2,9 +2,9 @@ import { SPRITE_COLORS, SPRITES } from '../avatar/sprites';
 import type { Gender, Mood } from '../avatar/sprites';
 
 /** The pixel avatar as a crisp SVG string for widgets (merged horizontal runs). */
-export function spriteSvg(gender: Gender, mood: Mood, scheme: 'light' | 'dark') {
+export function spriteSvg(gender: Gender, mood: Mood, scheme: 'light' | 'dark', tone?: Record<string, string>) {
   const rows = SPRITES[gender][mood];
-  const palette = SPRITE_COLORS[scheme] as Record<string, string>;
+  const palette = { ...(SPRITE_COLORS[scheme] as Record<string, string>), ...(tone ?? {}) };
   const rects: string[] = [];
   rows.forEach((row, y) => {
     let x = 0;
