@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MRitmo · Mide tu día en tiempo</title>
+  <meta name="description" content="MRitmo mide tu día en tiempo, no en número de tareas. Foco con temporizador en vivo, hábitos con racha y ranking con amigos. App para Android.">
+  <meta name="theme-color" content="#f7f3ea" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MRitmo">
+  <meta property="og:locale" content="es_CO">
+  <meta property="og:title" content="MRitmo · Mide tu día en tiempo">
+  <meta property="og:description" content="Mide tu día en tiempo, no en tareas. Foco, hábitos con racha y ranking con amigos. Para Android.">
+  <meta property="og:url" content="https://mritmo.com/">
+  <meta property="og:image" content="https://mritmo.com/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="El personaje de MRitmo dormido, sentado, de pie y celebrando, con el texto: Mide tu día en tiempo, no en tareas.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/icon.png">
+  <link rel="preload" href="/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css?v=c3351de">
+  <script>try{var t=localStorage.getItem('mritmo.theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+</head>
+<body>
+  <a class="skip" href="#contenido">Saltar al contenido</a>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/" aria-label="MRitmo, inicio"><img src="/icon.png" alt="" width="30" height="30">MRitmo</a>
+      <div class="right">
+        <a class="small" href="/ayuda/">Ayuda</a>
+        <div class="theme" role="group" aria-label="Tema">
+          <button type="button" data-set-theme="system" aria-pressed="true" aria-label="Tema del sistema" title="Sistema"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/></svg></button>
+          <button type="button" data-set-theme="light" aria-pressed="false" aria-label="Tema claro" title="Claro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+          <button type="button" data-set-theme="dark" aria-pressed="false" aria-label="Tema oscuro" title="Oscuro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+        </div>
+      </div>
+    </header>
+
+    <main id="contenido">
+      <h1>Mide tu día en tiempo, no en tareas.</h1>
+      <p class="lead">Cada tarea lleva su duración. Tu avance es el tiempo que ya cumpliste: dos horas pesan más que quince minutos.</p>
+
+      <div class="stage" role="img" aria-label="El personaje de MRitmo cambia de postura según tu avance: dormido al 0 %, sentado al empezar, de pie y concentrado desde la mitad, y con los brazos arriba al 100 %.">
+        <div class="pose"><canvas data-gender="m" data-mood="sueno" width="24" height="26"></canvas><span>0 %</span></div>
+        <div class="pose"><canvas data-gender="f" data-mood="calma" width="24" height="26"></canvas><span>30 %</span></div>
+        <div class="pose"><canvas data-gender="m" data-mood="foco" width="24" height="26"></canvas><span>70 %</span></div>
+        <div class="pose"><canvas data-gender="f" data-mood="fuerza" width="24" height="26"></canvas><span>100 %</span></div>
+      </div>
+
+      <div class="cta" id="descargar" data-android-only>
+        <a class="btn" href="/descargar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+          Descargar para Android
+        </a>
+        <div class="meta">
+          <span class="faint" data-version>La versión más reciente</span>
+          <details class="sha" data-sha hidden>
+            <summary>SHA-256 <code data-sha-short></code></summary>
+            <code class="full" data-sha-full></code>
+            <a href="/ayuda/#verificar">Cómo comprobar el archivo</a>
+          </details>
+        </div>
+      </div>
+      <div class="ios-note" data-ios-note hidden role="note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
+        <div><b>MRitmo es solo para Android por ahora.</b><p>No hay versión para iPhone. Si tienes un celular Android, abre mritmo.com desde él para descargarla.</p></div>
+      </div>
+
+      <section>
+        <div class="grid">
+          <div class="card"><h3>Hoy</h3><p>Planea tu día con la duración de cada tarea. El % solo mide tiempo; los hábitos llevan su propia racha.</p></div>
+          <div class="card"><h3>Foco</h3><p>Temporizador con la duración de la tarea, en la barra de estado y la Now Bar, aunque cierres la app.</p></div>
+          <div class="card"><h3>Amigos y salas</h3><p>Ranking del día y de la semana, con amigos o en salas. Solo se comparte tu %, tus minutos y si estás en foco; nunca tus tareas.</p></div>
+          <div class="card"><h3>Hábitos juntos</h3><p>Un hábito con un amigo y una racha que solo avanza el día que los dos cumplen.</p></div>
+        </div>
+      </section>
+
+      <section id="instalar">
+        <h2>Cómo instalar</h2>
+        <p class="muted">MRitmo todavía no está en Play Store: se instala con el archivo APK. Hazlo desde el celular Android.</p>
+        <ol class="steps">
+          <li><div><b>Descarga el APK.</b><p>Toca "Descargar para Android" en esta página, desde el celular. Es un archivo de unos 40 MB.</p></div></li>
+          <li><div><b>Ábrelo.</b><p>Toca la notificación de descarga o búscalo en Archivos → Descargas. Si Android lo pide, permite "Instalar apps desconocidas" para tu navegador.</p></div></li>
+          <li><div><b>Instala.</b><p>Si aparece Play Protect, toca "Más detalles" → "Instalar de todas formas". Hazlo solo con el archivo descargado de mritmo.com: la app está firmada siempre con la misma llave.</p></div></li>
+          <li><div><b>Abre MRitmo y crea tu cuenta.</b><p>La cuenta es opcional. Con ella, tus tareas, hábitos y ajustes quedan respaldados: si cambias de celular, inicias sesión y vuelve todo. Al crearla aceptas los <a href="/terminos/">Términos</a> y la <a href="/privacidad/">Política de privacidad</a>.</p></div></li>
+        </ol>
+        <p class="faint" style="margin-top:14px">Para actualizar, descarga la versión nueva e instálala encima: no pierdes nada. Requiere Android 7 o superior. ¿Algo no funciona? Mira la <a href="/ayuda/">Ayuda</a> o las <a href="/novedades/">Novedades</a>.</p>
+      </section>
+    </main>
+
+    <footer>
+      <nav aria-label="Información legal y contacto">
+        <a href="/novedades/">Novedades</a>
+        <a href="/ayuda/">Ayuda</a>
+        <a href="/privacidad/">Privacidad</a>
+        <a href="/terminos/">Términos</a>
+        <a href="/cookies/">Cookies</a>
+        <a href="/reembolsos/">Reembolsos</a>
+        <a href="/eliminar-cuenta/">Eliminar cuenta</a>
+        <a href="mailto:soporte@mritmo.com">soporte@mritmo.com</a>
+        <a href="https://github.com/s3bsbarr/MRitmo/releases">Todas las versiones</a>
+      </nav>
+      <p>© 2026 MRitmo · Proyecto independiente de una persona natural · Bogotá D.C., Colombia · App gratuita, sin anuncios ni rastreadores.</p>
+    </footer>
+  </div>
+  <script src="/sprites.js?v=c3351de"></script>
+  <script src="/site.js?v=c3351de"></script>
+</body>
+</html>
