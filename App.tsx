@@ -34,6 +34,7 @@ import { clearSharedCache } from './src/shared';
 import { useHabits, useShared, useTasks } from './src/store';
 import { deleteAccount, forgetSession, getSession, handleAuthUrl, scheduleSync, signOut, supabase, syncNow } from './src/sync';
 import { paletteFor, ThemeContext } from './src/theme';
+import { leaveTo, MotionGate } from './src/motion';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 configureNotifications();
@@ -410,6 +411,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeContext.Provider value={theme}>
+        <MotionGate />
         <BlurTargetContext.Provider value={target}>
           <View style={{ flex: 1, backgroundColor: c.bg }}>
             <BlurTargetView ref={target} style={{ flex: 1, backgroundColor: c.bg }}>
@@ -532,7 +534,12 @@ export default function App() {
               onAdd={onAdd}
               onSave={(id, item) => {
                 if (item.kind === 'habit') habitsApi.update(id, { title: item.title, time: item.time });
-                else api.update(id, { title: item.title, minutes: item.minutes, day: item.day, at: item.at });
+                else {
+                  // Moved to another day: the row leaves today's list toward that day (1.9.2).
+                  const before = api.tasks.find((t) => t.id === id);
+                  if (before && item.day && item.day !== before.day) leaveTo(item.day > before.day ? 1 : -1);
+                  api.update(id, { title: item.title, minutes: item.minutes, day: item.day, at: item.at });
+                }
               }}
             />
             <ActionsSheet request={actions} onClose={() => setActions(null)} />

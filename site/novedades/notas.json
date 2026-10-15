@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.9.2",
+    "date": "2026-10-15",
+    "title": "Movimiento que te dice qué cambió.",
+    "items": [
+      "Al completar una tarea, se tacha y baja sola a su lugar entre las hechas. El % del día cuenta hasta el nuevo valor y la barra avanza.",
+      "Una tarea nueva entra desde abajo, de donde está el +. Al eliminarla o pasarla a otro día, sale hacia un lado y el resto se acomoda sin saltos.",
+      "Al marcar un hábito, el check rebota un poco y la racha sube. En los hábitos juntos, cuando tu amigo marca y la racha avanza, la llama crece.",
+      "En el ranking de Amigos y en las salas, quien te pasa (o a quien pasas) se desliza a su nuevo puesto y su % cuenta hasta el valor nuevo.",
+      "Un amigo nuevo, o alguien que se une a tu sala, llega saludando con la mano y su fila se ilumina un momento.",
+      "Al aceptar o rechazar una solicitud o una invitación, la tarjeta se va y lo de abajo sube suave.",
+      "Si tu teléfono tiene \"Quitar animaciones\" activado, todo cambia al instante, sin movimiento."
+    ]
+  },
+  {
     "version": "1.9.1",
     "date": "2026-10-14",
     "title": "Hábitos juntos al instante y dos tonos para cada modo.",

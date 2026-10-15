@@ -5,7 +5,10 @@ import { dayKey } from '../data';
 import * as Haptics from '../haptics';
 import { friendName, markedBy, SharedFriend, SharedHabit, sharedStreak } from '../shared';
 import { font, radius, space, type, useTheme } from '../theme';
+import Animated, { LayoutAnimationConfig } from 'react-native-reanimated';
+import { cardOut, rowFadeIn, rowLayout } from '../motion';
 import { Press } from './Press';
+import { Streak } from './Streak';
 import { CheckRow } from './TaskRow';
 
 const IDEAS = ['Leer 20 min', 'Entrenar', 'Meditar 10 min', 'Dormir antes de las 11'];
@@ -74,11 +77,12 @@ export function SharedHabits({ friend, habits, onToggle, onInvite, onAccept, onR
   const card = { backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' as const };
 
   return (
+    <LayoutAnimationConfig skipEntering>
     <View style={{ marginTop: space.xl }}>
       <Text style={[type.headline, { color: c.text, marginBottom: space.md }]}>Hábitos juntos</Text>
 
       {incoming.map((h) => (
-        <View key={h.id} style={[card, { padding: space.lg, marginBottom: space.md }]}>
+        <Animated.View key={h.id} entering={rowFadeIn} exiting={cardOut} layout={rowLayout} style={[card, { padding: space.lg, marginBottom: space.md }]}>
           <Text style={[type.footnote, { color: c.textSecondary }]}>{who} te invita</Text>
           <Text style={[type.body, { color: c.text, fontFamily: font.semibold, marginTop: 2 }]} numberOfLines={2}>
             {h.title}
@@ -101,17 +105,17 @@ export function SharedHabits({ friend, habits, onToggle, onInvite, onAccept, onR
               <Text style={[type.callout, { color: c.text }]}>Rechazar</Text>
             </Press>
           </View>
-        </View>
+        </Animated.View>
       ))}
 
       {active.length > 0 && (
-        <View style={[card, { marginBottom: space.md }]}>
+        <Animated.View entering={rowFadeIn} exiting={cardOut} layout={rowLayout} style={[card, { marginBottom: space.md }]}>
           {active.map((h, i) => {
             const m = markedBy(h, today);
             const streak = sharedStreak(h, today);
             return (
+              <Animated.View key={h.id} entering={rowFadeIn} exiting={cardOut} layout={rowLayout}>
               <CheckRow
-                key={h.id}
                 square
                 checked={m.me}
                 title={h.title}
@@ -120,25 +124,20 @@ export function SharedHabits({ friend, habits, onToggle, onInvite, onAccept, onR
                 checkLabel={m.me ? `Desmarcar ${h.title}` : `Marcar ${h.title} como hecho hoy`}
                 onToggle={() => onToggle(h.id)}
                 onLongPress={() => onRemove(h)}
-                right={
-                  <View
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: space.md, opacity: streak === 0 && !(m.me && m.them) ? 0.45 : 1 }}
-                    accessible
-                    accessibilityLabel={`Racha compartida de ${streak} ${streak === 1 ? 'día' : 'días'}`}
-                  >
-                    <Ionicons name={m.me && m.them ? 'flame' : 'flame-outline'} size={18} color={c.text} />
-                    <Text style={[type.callout, { color: c.text, fontVariant: ['tabular-nums'], fontFamily: font.semibold }]}>{streak}</Text>
-                  </View>
-                }
+                right={<Streak n={streak} lit={m.me && m.them} shared people={false} />}
               />
+              </Animated.View>
             );
           })}
-        </View>
+        </Animated.View>
       )}
 
       {outgoing.map((h) => (
-        <View
+        <Animated.View
           key={h.id}
+          entering={rowFadeIn}
+          exiting={cardOut}
+          layout={rowLayout}
           style={[card, { flexDirection: 'row', alignItems: 'center', minHeight: 56, paddingLeft: space.lg, marginBottom: space.md }]}
         >
           <View style={{ flex: 1 }}>
@@ -150,9 +149,11 @@ export function SharedHabits({ friend, habits, onToggle, onInvite, onAccept, onR
           <Press onPress={() => onRemove(h)} accessibilityRole="button" accessibilityLabel={`Cancelar invitación ${h.title}`} style={{ padding: space.md }}>
             <Text style={[type.callout, { color: c.textSecondary }]}>Cancelar</Text>
           </Press>
-        </View>
+        </Animated.View>
       ))}
 
+      {/* Below the cards: slides up when one leaves instead of jumping. */}
+      <Animated.View layout={rowLayout}>
       {creating ? (
         <View style={[card, { padding: space.lg }]}>
           <TextInput
@@ -231,6 +232,8 @@ export function SharedHabits({ friend, habits, onToggle, onInvite, onAccept, onR
       )}
       {sent ? <Text style={[type.footnote, { color: c.textSecondary, marginTop: space.sm }]}>{sent}</Text> : null}
       {error ? <Text style={[type.footnote, { color: c.danger, marginTop: space.sm }]}>{error}</Text> : null}
+      </Animated.View>
     </View>
+    </LayoutAnimationConfig>
   );
 }

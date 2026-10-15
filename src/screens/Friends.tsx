@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import Animated, { LayoutAnimationConfig } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '../avatar/Avatar';
 import { BoardList, PeriodSwitch } from '../components/BoardList';
@@ -36,6 +37,7 @@ import {
   weekOfMine,
 } from '../friends';
 import { blockUser, loadBlockedIds } from '../privacy';
+import { cardOut, rowFadeIn, rowLayout } from '../motion';
 import { dayChip, timeLabel } from '../format';
 import { dayKey } from '../data';
 import * as Haptics from '../haptics';
@@ -633,8 +635,11 @@ export function Friends({
 
       {linkTarget && <LinkCard target={linkTarget} me={me} friends={st.friends} outgoing={st.outgoing} onDone={() => { setLinkTarget(null); setPendingAdd(null); load(); }} />}
 
+      {/* 1.9.2: everything below moves smoothly when a list above grows or shrinks. */}
+      <LayoutAnimationConfig skipEntering>
       <Header title={period === 'day' ? 'Ranking del día' : 'Ranking de la semana'} right={<PeriodSwitch value={period} onChange={setPeriod} />} />
       <BoardList rows={board} period={period} now={now} onOpen={openSheet} onLongPress={(r) => askRemove(r.profile)} />
+      <Animated.View layout={rowLayout}>
       {st.friends.length === 0 && (
         <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.md }]}>
           Aún no tienes amigos aquí. Comparte tu enlace (arriba, junto a tu usuario) o agrega el de alguien abajo.
@@ -665,15 +670,15 @@ export function Friends({
           Una sala es un ranking propio con un grupo: el equipo, la familia, los del gimnasio. Crea una e invita a tus amigos.
         </Text>
       ) : (
-        <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+        <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
           {[...roomInvites, ...joinedRooms].map((room, i, list) => {
             const invited = room.myStatus === 'invited';
             const rows = invited ? [] : roomRows(room, period);
             const place = rows.findIndex((r) => r.me) + 1;
             const count = room.members.filter((m) => m.status === 'joined').length;
             return (
+              <Animated.View key={room.id} entering={rowFadeIn} exiting={cardOut} layout={rowLayout}>
               <Press
-                key={room.id}
                 onPress={() => openRoom(room.id)}
                 scaleTo={0.99}
                 accessibilityRole="button"
@@ -707,18 +712,19 @@ export function Friends({
                   <Ionicons name="chevron-forward" size={18} color={c.textTertiary} />
                 )}
               </Press>
+              </Animated.View>
             );
           })}
-        </View>
+        </Animated.View>
       )}
 
       {st.incoming.length > 0 && (
-        <>
+        <Animated.View entering={rowFadeIn} exiting={cardOut} layout={rowLayout}>
           <Header title="Solicitudes" />
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+          <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {st.incoming.map((p, i) => (
+              <Animated.View key={p.id} entering={rowFadeIn} exiting={cardOut} layout={rowLayout}>
               <Press
-                key={p.id}
                 onLongPress={() => askBlock(p)}
                 delayLongPress={450}
                 scaleTo={0.99}
@@ -762,19 +768,23 @@ export function Friends({
                   <Text style={[type.callout, { color: c.inkOnInk, fontFamily: font.semibold }]}>Aceptar</Text>
                 </Press>
               </Press>
+              </Animated.View>
             ))}
-          </View>
-          <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.sm }]}>Mantén presionada una solicitud para bloquear a esa persona.</Text>
-        </>
+          </Animated.View>
+          <Animated.Text layout={rowLayout} style={[type.footnote, { color: c.textTertiary, marginTop: space.sm }]}>Mantén presionada una solicitud para bloquear a esa persona.</Animated.Text>
+        </Animated.View>
       )}
 
       {habitInvites.length > 0 && (
-        <>
+        <Animated.View entering={rowFadeIn} exiting={cardOut} layout={rowLayout}>
           <Header title="Hábitos juntos" />
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+          <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {habitInvites.map((h, i) => (
-              <View
+              <Animated.View
                 key={h.id}
+                entering={rowFadeIn}
+                exiting={cardOut}
+                layout={rowLayout}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -809,12 +819,13 @@ export function Friends({
                 >
                   <Text style={[type.callout, { color: c.inkOnInk, fontFamily: font.semibold }]}>Aceptar</Text>
                 </Press>
-              </View>
+              </Animated.View>
             ))}
-          </View>
-        </>
+          </Animated.View>
+        </Animated.View>
       )}
 
+      <Animated.View layout={rowLayout}>
       <Header title="Agregar amigo" />
       <View style={{ flexDirection: 'row', gap: space.sm }}>
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -830,14 +841,18 @@ export function Friends({
         </Press>
       </View>
       {notice ? <Text style={[type.footnote, { color: c.textSecondary, marginTop: space.sm }]}>{notice}</Text> : null}
+      </Animated.View>
 
       {st.outgoing.length > 0 && (
-        <>
+        <Animated.View entering={rowFadeIn} exiting={cardOut} layout={rowLayout}>
           <Header title="Enviadas" />
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+          <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {st.outgoing.map((p, i) => (
-              <View
+              <Animated.View
                 key={p.id}
+                entering={rowFadeIn}
+                exiting={cardOut}
+                layout={rowLayout}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -858,15 +873,17 @@ export function Friends({
                 >
                   <Text style={[type.callout, { color: c.textSecondary }]}>Cancelar</Text>
                 </Press>
-              </View>
+              </Animated.View>
             ))}
-          </View>
-        </>
+          </Animated.View>
+        </Animated.View>
       )}
 
-      <Text style={[type.footnote, { color: c.textTertiary, marginTop: space.xxl, textAlign: 'center' }]}>
+      <Animated.Text layout={rowLayout} style={[type.footnote, { color: c.textTertiary, marginTop: space.xxl, textAlign: 'center' }]}>
         Solo compartes el % del día y de la semana, y si estás en foco. Toca a alguien para ver su semana.
-      </Text>
+      </Animated.Text>
+      </Animated.View>
+      </LayoutAnimationConfig>
 
       <RoomSheet
         visible={roomOpen}

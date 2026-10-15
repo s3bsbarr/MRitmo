@@ -3,7 +3,7 @@ import * as Haptics from '../haptics';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Avatar, Gender, moodFor } from '../avatar/Avatar';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAV_HEIGHT } from '../components/NavBar';
 import { Press } from '../components/Press';
@@ -12,6 +12,9 @@ import type { ItemActions } from '../components/ActionsSheet';
 import type { Editing } from '../components/AddSheet';
 import type { ConfirmRequest } from '../components/ConfirmSheet';
 import { CheckRow, TaskRow } from '../components/TaskRow';
+import { Counted, useSettledOrder } from '../components/Motion';
+import { Streak } from '../components/Streak';
+import { fromAdd, leaveTo, rowFadeIn, rowLayout, slideAway } from '../motion';
 import { streakOf } from '../data';
 import { dayChip, formatMinutes, hhmmLabel, longDate, timeLabel } from '../format';
 import { friendName, markedBy, SharedHabit, sharedStreak } from '../shared';
@@ -77,7 +80,10 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
       detail: `${formatMinutes(t.minutes)}${t.at ? ` · ${dayChip(t.day, api.today)} ${timeLabel(t.at)}` : ''}`,
       confirmLabel: 'Eliminar',
       destructive: true,
-      onConfirm: () => api.remove(t.id),
+      onConfirm: () => {
+        leaveTo(-1);
+        api.remove(t.id);
+      },
     });
 
   const sharedActions = (h: SharedHabit) =>
@@ -92,7 +98,10 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
           detail: `Se quita para ti y para ${friendName(h.friend)}, y se pierde la racha de ${sharedStreak(h, api.today)}.`,
           confirmLabel: 'Dejar hábito',
           destructive: true,
-          onConfirm: () => sharedApi.remove(h.id).catch(() => {}),
+          onConfirm: () => {
+            leaveTo(-1);
+            sharedApi.remove(h.id).catch(() => {});
+          },
         }),
     });
 
@@ -103,9 +112,16 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
       detail: `Racha actual: ${streakOf(h, api.today)} ${streakOf(h, api.today) === 1 ? 'día' : 'días'}. Se borra su historial.`,
       confirmLabel: 'Eliminar',
       destructive: true,
-      onConfirm: () => habitsApi.remove(h.id),
+      onConfirm: () => {
+        leaveTo(-1);
+        habitsApi.remove(h.id);
+      },
     });
   const { total, done, ratio } = progressOf(todayTasks);
+  // A completed task keeps its place while its strike draws, then slides down.
+  const shownTasks = useSettledOrder(todayTasks, (t) => t.id);
+  // Rows mounted with the screen don't animate in; only rows that arrive later do.
+  const enteringFor = (createdAt: number) => (Date.now() - createdAt < 2500 ? fromAdd : rowFadeIn);
   const pct = Math.round(ratio * 100);
   const remaining = total - done;
   const mood = moodFor(ratio, todayTasks.length > 0);
@@ -128,6 +144,8 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
       }}
       showsVerticalScrollIndicator={false}
     >
+      {/* What is on screen when it opens doesn't animate in; what arrives later does. */}
+      <LayoutAnimationConfig skipEntering>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, paddingBottom: space.xs }}>
           <Text style={[type.largeTitle, { color: c.text }]} accessibilityRole="header">
@@ -147,7 +165,7 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
               style={[type.display, { color: c.text, fontVariant: ['tabular-nums'] }]}
               accessibilityLabel={`${pct} por ciento del día completado`}
             >
-              {pct}
+              <Counted value={pct} />
               <Text style={[type.title, { color: c.textSecondary, letterSpacing: -0.4 }]}> %</Text>
             </Text>
             <View style={{ alignItems: 'flex-end', paddingBottom: 10 }}>
@@ -218,25 +236,25 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
       ) : (
         <>
           <SectionHeader title="Tareas" count={`${todayTasks.filter((t) => t.done).length} de ${todayTasks.length}`} />
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
-            {todayTasks.map((t, i) => (
-              <Animated.View key={t.id} entering={FadeIn.duration(200)} layout={LinearTransition.duration(240)}>
-                <TaskRow task={t} last={i === todayTasks.length - 1} onToggle={api.toggle} onRequestRemove={taskActions} onFocus={onFocus} />
-              </Animated.View>
-            ))}
-          </View>
-        </>
+                      <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+              {shownTasks.map((t, i) => (
+                <Animated.View key={t.id} entering={enteringFor(t.createdAt)} exiting={slideAway} layout={rowLayout}>
+                  <TaskRow task={t} last={i === shownTasks.length - 1} onToggle={api.toggle} onRequestRemove={taskActions} onFocus={onFocus} />
+                </Animated.View>
+              ))}
+            </Animated.View>
+                  </>
       )}
 
       {habitCount > 0 && (
         <>
           <SectionHeader title="Hábitos" count={`${habitsDone} de ${habitCount}`} />
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+                    <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {habits.map((h, i) => {
               const checked = h.checks.includes(api.today);
               const streak = streakOf(h, api.today);
               return (
-                <Animated.View key={h.id} entering={FadeIn.duration(200)} layout={LinearTransition.duration(240)}>
+                <Animated.View key={h.id} entering={enteringFor(h.createdAt)} exiting={slideAway} layout={rowLayout}>
                   <CheckRow
                     square
                     checked={checked}
@@ -256,7 +274,7 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
               const who = friendName(h.friend);
               const meta = m.me && m.them ? `Con ${who} · marcaron los dos` : m.them ? `Con ${who} · ya marcó, faltas tú` : m.me ? `Con ${who} · falta ${who}` : `Con ${who}`;
               return (
-                <Animated.View key={h.id} entering={FadeIn.duration(200)} layout={LinearTransition.duration(240)}>
+                <Animated.View key={h.id} entering={rowFadeIn} exiting={slideAway} layout={rowLayout}>
                   <CheckRow
                     square
                     checked={m.me}
@@ -271,17 +289,17 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
                 </Animated.View>
               );
             })}
-          </View>
-        </>
+          </Animated.View>
+                  </>
       )}
 
       {upcoming.length > 0 && (
         <>
           <SectionHeader title="Próximos días" count={String(upcoming.length)} />
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+                    <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
             {(showAllUpcoming ? upcoming : upcoming.slice(0, 3)).map((t, i, list) => (
+              <Animated.View key={t.id} entering={enteringFor(t.createdAt)} exiting={slideAway} layout={rowLayout}>
               <TaskRow
-                key={t.id}
                 task={t}
                 meta={`${dayChip(t.day, api.today)}${t.at ? ` · ${timeLabel(t.at)}` : ''}`}
                 last={i === list.length - 1}
@@ -289,9 +307,10 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
                 onRequestRemove={taskActions}
                 onFocus={onFocus}
               />
+              </Animated.View>
             ))}
-          </View>
-          {upcoming.length > 3 && (
+          </Animated.View>
+                    {upcoming.length > 3 && (
             <Press onPress={() => setShowAllUpcoming(!showAllUpcoming)} style={{ alignSelf: 'center', padding: space.sm, marginTop: space.xs }}>
               <Text style={[type.callout, { color: c.textSecondary }]}>{showAllUpcoming ? 'Ver menos' : `Ver las ${upcoming.length}`}</Text>
             </Press>
@@ -304,25 +323,7 @@ export function Today({ api, habitsApi, sharedApi, gender, name, onAdd, onFocus,
           Toca una tarea para enfocarte. Mantén presionado para editar o eliminar.
         </Text>
       )}
+      </LayoutAnimationConfig>
     </ScrollView>
-  );
-}
-
-/**
- * Streak counter: a flame in the ink color (white in dark mode, black in light).
- * A shared streak adds a small "people" mark: it only lights when both marked.
- */
-function Streak({ n, lit, shared }: { n: number; lit: boolean; shared?: boolean }) {
-  const { c } = useTheme();
-  return (
-    <View
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: space.md, opacity: n === 0 && !lit ? 0.45 : 1 }}
-      accessible
-      accessibilityLabel={`Racha${shared ? ' compartida' : ''} de ${n} ${n === 1 ? 'día' : 'días'}`}
-    >
-      {shared && <Ionicons name="people-outline" size={15} color={c.textSecondary} style={{ marginRight: 3 }} />}
-      <Ionicons name={lit ? 'flame' : 'flame-outline'} size={18} color={c.text} />
-      <Text style={[type.callout, { color: c.text, fontVariant: ['tabular-nums'], fontFamily: 'Inter_600SemiBold' }]}>{n}</Text>
-    </View>
   );
 }

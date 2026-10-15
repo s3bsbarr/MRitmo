@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { DUR, EASE_OUT } from '../motion';
 import { useTheme } from '../theme';
-
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 /** The fill is absolute and childless, so animating its width never re-lays-out siblings. */
 export function ProgressBar({ ratio, height = 6 }: { ratio: number; height?: number }) {
@@ -11,7 +10,7 @@ export function ProgressBar({ ratio, height = 6 }: { ratio: number; height?: num
   const p = useSharedValue(ratio);
 
   useEffect(() => {
-    p.set(withTiming(Math.min(1, Math.max(0, ratio)), { duration: 520, easing: EASE_OUT }));
+    p.set(withTiming(Math.min(1, Math.max(0, ratio)), { duration: DUR.count, easing: EASE_OUT }));
   }, [ratio, p]);
 
   const fill = useAnimatedStyle(() => ({ width: `${p.get() * 100}%` }));

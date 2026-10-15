@@ -177,7 +177,7 @@ export function RoomSheet({ visible, room, creating, rowsFor, friends, now, onCl
             {rows.length} {rows.length === 1 ? 'persona' : 'personas'}
             {period === 'week' ? ' · de lunes a hoy' : ' · hoy, en vivo'}
           </Text>
-          <BoardList rows={rows} period={period} now={now} onLongPress={room.mine ? (r) => onRemoveMember(room, r.profile) : undefined} />
+          <BoardList key={room.id} rows={rows} period={period} now={now} onLongPress={room.mine ? (r) => onRemoveMember(room, r.profile) : undefined} />
 
           {invited.length > 0 && (
             <Text style={[type.footnote, { color: c.textSecondary, marginTop: space.md }]}>

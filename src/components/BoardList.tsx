@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRef } from 'react';
 import { Text, View } from 'react-native';
+import Animated, { LayoutAnimationConfig } from 'react-native-reanimated';
 import { Avatar } from '../avatar/Avatar';
 import { moodFor } from '../avatar/mood';
 import { formatShort } from '../format';
 import type { BoardRow, Period } from '../friends';
 import * as Haptics from '../haptics';
 import { font, radius, space, type, useTheme } from '../theme';
+import { cardOut, rowFadeIn, rowLayout } from '../motion';
+import { ArrivalWash, Counted } from './Motion';
 import { Press } from './Press';
 
 type Props = {
@@ -22,9 +26,26 @@ type Props = {
  */
 export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
   const { c } = useTheme();
+  // 1.9.2: who was already here when the list first showed. Anyone after that
+  // (a request accepted, someone who joined the room) arrives waving, with the
+  // row lit for a moment. Never forgotten, so a reload doesn't greet twice.
+  const seen = useRef<Set<string> | null>(null);
+  const arrived = useRef<Set<string>>(new Set());
+  if (seen.current === null) {
+    if (rows.length > 0) seen.current = new Set(rows.map((r) => r.profile.id));
+  } else {
+    for (const r of rows) {
+      if (!seen.current.has(r.profile.id)) {
+        seen.current.add(r.profile.id);
+        if (!r.me) arrived.current.add(r.profile.id);
+      }
+    }
+  }
   return (
-    <View style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
+    <LayoutAnimationConfig skipEntering>
+    <Animated.View layout={rowLayout} style={{ backgroundColor: c.surface, borderRadius: radius.lg, overflow: 'hidden' }}>
       {rows.map((r, i) => {
+        const isNew = arrived.current.has(r.profile.id);
         const pct = Math.round(r.ratio * 100);
         const inFocus = r.focusUntil !== null && r.focusUntil > now;
         const name = r.me ? 'Tú' : r.profile.display_name || `@${r.profile.username}`;
@@ -38,8 +59,9 @@ export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
               : 'Sin plan todavía';
         const meHidden = r.me && Boolean(r.profile.hide_progress);
         return (
+          <Animated.View key={r.profile.id} layout={rowLayout} entering={rowFadeIn} exiting={cardOut}>
+          {isNew ? <ArrivalWash color={c.ink} /> : null}
           <Press
-            key={r.profile.id}
             onPress={onOpen ? () => onOpen(r) : undefined}
             onLongPress={onLongPress && !r.me ? () => onLongPress(r) : undefined}
             delayLongPress={400}
@@ -62,7 +84,7 @@ export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
             }}
           >
             <Text style={[type.headline, { color: c.textTertiary, width: 20, fontVariant: ['tabular-nums'] }]}>{r.hidden ? '–' : i + 1}</Text>
-            <Avatar gender={r.profile.gender} mood={r.hidden ? 'calma' : moodFor(r.ratio, r.total > 0)} px={2} still />
+            <Avatar gender={r.profile.gender} mood={r.hidden ? 'calma' : moodFor(r.ratio, r.total > 0)} px={2} still wave={isNew} />
             <View style={{ flex: 1 }}>
               <Text style={[type.body, { color: c.text, fontFamily: r.me ? font.semibold : font.regular }]} numberOfLines={1}>
                 {name}
@@ -77,14 +99,16 @@ export function BoardList({ rows, period, now, onOpen, onLongPress }: Props) {
               <Ionicons name="eye-off-outline" size={20} color={c.textTertiary} />
             ) : (
               <Text style={[type.title, { color: c.text, fontVariant: ['tabular-nums'] }]}>
-                {pct}
+                <Counted value={pct} />
                 <Text style={[type.footnote, { color: c.textSecondary }]}> %</Text>
               </Text>
             )}
           </Press>
+          </Animated.View>
         );
       })}
-    </View>
+    </Animated.View>
+    </LayoutAnimationConfig>
   );
 }
 

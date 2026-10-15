@@ -3,7 +3,8 @@ import { Pressable, View } from 'react-native';
 import Animated, { Easing, Keyframe, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import * as Haptics from '../haptics';
 import { useTheme } from '../theme';
-import { Gender, Mood, SMILES, SPRITE_COLORS, SPRITES } from './sprites';
+import { useCalm } from '../motion';
+import { Gender, Mood, SMILES, SPRITE_COLORS, SPRITES, WAVES } from './sprites';
 
 export type { Gender, Mood };
 
@@ -75,6 +76,7 @@ export function Avatar({
   px = 4,
   interactive = false,
   still = false,
+  wave = false,
 }: {
   gender: Gender;
   mood: Mood;
@@ -82,11 +84,29 @@ export function Avatar({
   interactive?: boolean;
   /** In lists: no entrance animation (it misbehaves inside scrolling rows). */
   still?: boolean;
+  /** 1.9.2: a friend who just arrived waves for under a second (skipped with reduce motion). */
+  wave?: boolean;
 }) {
   const { c } = useTheme();
   const palette = c.sprite ?? (SPRITE_COLORS[c.scheme] as Record<string, string>);
   const reduced = useReducedMotion();
   const [smiling, setSmiling] = useState(false);
+  const calm = useCalm();
+  const [waveFrame, setWaveFrame] = useState(-1);
+  useEffect(() => {
+    if (!wave || calm) return;
+    const seq = [0, 1, 0, 1, 0];
+    let i = 0;
+    setWaveFrame(seq[0]);
+    const id = setInterval(() => {
+      i++;
+      if (i >= seq.length) {
+        clearInterval(id);
+        setWaveFrame(-1);
+      } else setWaveFrame(seq[i]);
+    }, 170);
+    return () => clearInterval(id);
+  }, [wave, calm]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const y = useSharedValue(0);
   const hop = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
@@ -109,7 +129,7 @@ export function Avatar({
     <View accessible accessibilityRole={interactive ? 'button' : 'image'} accessibilityLabel={LABEL[mood]} style={{ width: SPRITE_W * px, height: SPRITE_H * px }}>
       <Animated.View style={hop}>
         <Animated.View key={`${gender}-${mood}`} entering={still ? undefined : enter}>
-          <Sprite rows={(smiling ? SMILES : SPRITES)[gender][mood]} palette={palette} px={px} />
+          <Sprite rows={waveFrame >= 0 ? WAVES[gender][waveFrame] : (smiling ? SMILES : SPRITES)[gender][mood]} palette={palette} px={px} />
         </Animated.View>
       </Animated.View>
     </View>

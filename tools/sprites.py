@@ -179,6 +179,21 @@ def frame(gender, mood, face=None):
     return rows
 
 
+def wave(gender, down=False):
+    """Standing with one arm raised and a grin: a new friend saying hi (1.9.2).
+    Two frames: the raised forearm drops one pixel in the second one."""
+    st = [list(r) for r in frame(gender, 'foco', face='fuerza')]
+    fl = frame(gender, 'fuerza', face='fuerza')
+    for y in range(13, 20):
+        for x in range(17, W):
+            st[y][x] = '.'
+    for y in range(3, 17):
+        for x in range(17, W):
+            if fl[y][x] != '.':
+                st[y + 1 if (down and y < 12) else y][x] = fl[y][x]
+    return [''.join(r) for r in st]
+
+
 # Two floating Zs, drawn in the detail ink so they follow the theme.
 ZZZ = [
     (0, 20, "ZZZZ"), (1, 22, "Z"), (2, 21, "Z"), (3, 20, "ZZZZ"),
@@ -234,5 +249,8 @@ if __name__ == '__main__':
         smiles = {g: {m: frame(g, m, face='fuerza') for m in MOODS} for g in ('m', 'f')}
         f.write('/** Same poses with a big grin, shown for a moment when the character is tapped. */\n')
         f.write(f'export const SMILES: Record<Gender, Record<Mood, string[]>> = {json.dumps(smiles, indent=2)};\n')
+        waves = {g: [wave(g), wave(g, down=True)] for g in ('m', 'f')}
+        f.write('/** Two frames of a wave (one arm up, grin): a friend who just joined the board (1.9.2). */\n')
+        f.write(f'export const WAVES: Record<Gender, string[][]> = {json.dumps(waves, indent=2)};\n')
         f.write(f'export const SPRITE_COLORS = {json.dumps(THEMES, indent=2)} as const;\n')
     print('ok')
